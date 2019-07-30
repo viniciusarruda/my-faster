@@ -11,18 +11,17 @@ class RPN(nn.Module):
 
         ### Information about the feature extractor ###
         self.receptive_field_size = receptive_field_size
-        self.input_img_size = input_img_size # w,h
+        self.input_img_size = input_img_size # (n_rows, n_cols)
         ###############################################
 
         ### Anchor related attributes ###
         self.anchor_ratios = [0.5, 1, 2] 
         self.anchor_scales = [8, 16, 32]
         self.k = len(self.anchor_scales) * len(self.anchor_ratios)
-        self.anchors = self._get_anchors()
         self.anchors_parameters = self._get_anchors_parameters()
         #################################
 
-        self.out_dim = 24
+        self.out_dim = 24 # why ? ahco que eu escolhi aleatoriamente
         self.conv_rpn = nn.Conv2d(in_channels=feature_extractor_out_dim, out_channels=self.out_dim, kernel_size=3, stride=1, padding=1, bias=True)
 
         self.cls_layer = nn.Conv2d(self.out_dim, self.k * 2, kernel_size=1, stride=1, padding=0)
@@ -30,77 +29,160 @@ class RPN(nn.Module):
 
 
     def forward(self, x):
+        # x -> (batch_size, feature_extractor_out_dim, 64, 64)
 
         x = F.relu(self.conv_rpn(x))
+        # x -> (batch_size, feature_extractor_out_dim, 64, 64)
+
+
+        ### Compute the probability to be an object ###
 
         cls_out = self.cls_layer(x)
-        batch_size, _, w, h = cls_out.size()
-        cls_out = cls_out.reshape((batch_size, w, h, self.k, 2))
-        prob_object = F.softmax(cls_out, dim=4)[:, :, :, :, 0] # select just the probability of be a object
-        prob_object = prob_object.reshape((batch_size, w, h, self.k))
-        
+        # cls_out -> (batch_size, k * 2, 64, 64)
+        # para cada ancora, prob de obj e ~obj
+
+        batch_size, _, n_rows, n_cols = cls_out.size()
+        cls_out = cls_out.reshape((batch_size, n_rows, n_cols, self.k, 2))
+        # cls_out -> (batch_size, 64, 64, k, 2)
+
+        prob_object = F.softmax(cls_out, dim=4)[:, :, :, :, 0] # select just the probability to be an object
+        # prob_object -> (batch_size, 64, 64, k)
+
+        ###############################################
+
+        ### Compute the object proposals ###
+
         reg_out = self.reg_layer(x)
+        # reg_out -> (batch_size, k * 4, 64, 64)
+        
         proposals = self._anchors2proposals(reg_out)
-        # proposals to bbox..
+        # proposals -> (batch_size, k * 4, 64, 64)
+
+        ####################################
+
+        proposals = proposals.permute(0, 2, 3, 1).reshape(batch_size, -1, 4)
+        # proposals -> (batch_size, k * 64 * 64, 4)
+        
+        prob_object = prob_object.view(batch_size, -1)
+        # prob_object -> (batch_size, 64 * 64 * k)
+
+        # torch.int64 -> index
+        # torch.uint8 -> true or false (mask)
+        cond = proposals[0, :, 2] >= 16.0
+        proposals = proposals[:, cond, :]
+        prob_object = prob_object[:, cond]
+
+        cond = proposals[0, :, 3] >= 16.0
+        proposals = proposals[:, cond, :]
+        prob_object = prob_object[:, cond]
+
+        proposals = self._offset2bbox(proposals)
+        proposals = self._clip_boxes(proposals)
+
+        # proposals -> (batch_size, -1, 4)
+        # prob_object -> (batch_size, -1)
+        
+        # ATE AQUI TUDO CERTO !
 
         ### NMS ###
         # TODO: Remove the for loop somehow !
+        batch_proposals = []
+        batch_prob_object = []
         for i in range(batch_size):
 
-            i_prob_object = prob_object[i].view(-1)
-            i_proposals = proposals[i].view(4, -1)
+            i_proposals_o = proposals[i, :, :]
+            i_prob_object_o = prob_object[i, :]
 
-            idxs = torch.argsort(i_prob_object, descending=True)
+            idxs = torch.argsort(i_prob_object_o, descending=True)
+            n_proposals = 600
+            idxs = idxs[:n_proposals]
 
-            i_prob_object = i_prob_object[idxs]
-            i_proposals = i_proposals[:, idxs]
+            i_proposals = i_proposals_o[idxs, :]
+            i_prob_object = i_prob_object_o[idxs]
 
-            n_proposals = idxs.size()[0]
+            k = 0
+            while k < i_proposals.size()[0]:
 
-            ### Remove iou > 0.7 ###
-            # [tx, ty, tw, th]
-            area_0 = i_proposals[2, 0] * i_proposals[3, 0]
-            x0_0, y0_0, x1_0, y1_0 = i_proposals[0, 0], i_proposals[1, 0], i_proposals[0, 0] + i_proposals[2, 0], i_proposals[1, 0] + i_proposals[3, 0] 
-            # print(area_0)
-            for j in range(1, n_proposals):
+                ### Remove iou > 0.7 ###
+                x0_0, y0_0, x1_0, y1_0 = i_proposals[k, 0], i_proposals[k, 1], i_proposals[k, 2], i_proposals[k, 3]
+                area_0 = (x1_0 - x0_0 + 1) * (y1_0 - y0_0 + 1)
+                assert x1_0 > x0_0 and y1_0 > y0_0 # just to ensure.. but this is dealt before I think
 
-                j = 1110
-                x0_j, y0_j, x1_j, y1_j = i_proposals[0, j], i_proposals[1, j], i_proposals[0, j] + i_proposals[2, j], i_proposals[1, j] + i_proposals[3, j] 
-                
-                print(x0_0, y0_0, x1_0, y1_0)
-                print(x0_j, y0_j, x1_j, y1_j)
-                
-                x0 = torch.max(x0_0, x0_j)
-                y0 = torch.max(y0_0, y0_j)
-                x1 = torch.min(x1_0, x1_j)
-                y1 = torch.min(y1_0, y1_j)
-                intersection = (x1 - x0) * (y1 - y0)
-                w = max(x1 - x0, 0)
-                h = max(y1 - y0, 0)
-                intersection = 
-                area_j = i_proposals[2, j] * i_proposals[3, j]
-                
-                union = area_0 + area_j - intersection
-                iou = intersection / union
-                
-                print(iou, j)
-                exit()
+                marked_to_keep = []
 
-            # print(i_prob_object.size())
-            # print(i_proposals.size())
+                for j in range(k+1, i_proposals.size()[0]):
 
-            # print(i_prob_object[idx])
+                    x0_j, y0_j, x1_j, y1_j = i_proposals[j, 0], i_proposals[j, 1], i_proposals[j, 2], i_proposals[j, 3]
+                    
+                    x0 = torch.max(x0_0, x0_j)
+                    y0 = torch.max(y0_0, y0_j)
+                    x1 = torch.min(x1_0, x1_j)
+                    y1 = torch.min(y1_0, y1_j)
+                    
+                    intersection = torch.clamp(x1 - x0 + 1, min=0) * torch.clamp(y1 - y0 + 1, min=0)
+                    area_j = (x1_j - x0_j + 1) * (y1_j - y0_j + 1)
+
+                    union = area_0 + area_j - intersection
+                    iou = intersection / union
+
+                    if iou <= 0.7:
+                        marked_to_keep.append(j)
+
+                # keep
+                i_proposals = torch.cat((i_proposals[:k+1, :], i_proposals[marked_to_keep, :]), dim=0)
+                i_prob_object = torch.cat((i_prob_object[:k+1], i_prob_object[marked_to_keep]), dim=0)
+                k += 1
+            
+            batch_proposals.append(i_proposals)
+            batch_prob_object.append(i_prob_object)
+
+        ### end of NMS ###
+
+        proposals = torch.stack(batch_proposals, dim=0)
+        prob_object = torch.stack(batch_prob_object, dim=0)
+
+        proposals = self._bbox2offset(proposals)
+
+        return proposals, prob_object
 
 
-            exit()
-        ### NMS ###
+    def _bbox2offset(self, bboxes):
+        """
+        bboxes: batch_size, -1, 4
+        proposals: batch_size, -1, 4
 
-        
-        # NMS
-        # ROI pooling
+        """
 
-        
-        return cls_out, reg_out, proposals
+        bx0 = bboxes[:, :, 0]
+        by0 = bboxes[:, :, 1]
+        bx1 = bboxes[:, :, 2]
+        by1 = bboxes[:, :, 3]
+
+        ox = bx0
+        oy = by0
+        ow = bx1 - bx0 + 1
+        oh = by1 - by0 + 1
+
+        offsets = torch.stack((ox, oy, ow, oh), dim=2)
+
+        return offsets
+
+
+    def _offset2bbox(self, proposals):
+        """
+        proposals: batch_size, -1, 4
+        bboxes: batch_size, -1, 4
+
+        """
+
+        bx0 = proposals[:, :, 0]
+        by0 = proposals[:, :, 1]
+        bx1 = bx0 + proposals[:, :, 2] - 1
+        by1 = by0 + proposals[:, :, 3] - 1
+
+        bboxes = torch.stack((bx0, by0, bx1, by1), dim=2)
+
+        return bboxes
 
 
     def _anchors2proposals(self, reg_out):
@@ -115,7 +197,11 @@ class RPN(nn.Module):
         phi = ahi * exp(thi)
 
         """
-        ax, ay, aw, ah = self.anchors_parameters
+        # ax, ay, aw, ah = self.anchors_parameters
+        ax = self.anchors_parameters[:, 0].view(1, -1, 1, 1)
+        ay = self.anchors_parameters[:, 1].view(1, -1, 1, 1)
+        aw = self.anchors_parameters[:, 2].view(1, -1, 1, 1)
+        ah = self.anchors_parameters[:, 3].view(1, -1, 1, 1)
     
         tx = reg_out[:, 0::4, :, :]
         ty = reg_out[:, 1::4, :, :]
@@ -131,68 +217,110 @@ class RPN(nn.Module):
 
         return proposals
 
+    
+    def _clip_boxes(self, bboxes):
+        """
+        bboxes: batch_size, -1, 4
+        bboxes: batch_size, -1, 4
+
+        """
+
+        bx0 = bboxes[:, 0::4, :].clamp(0, self.input_img_size[0]-1)
+        by0 = bboxes[:, 1::4, :].clamp(0, self.input_img_size[1]-1)
+        bx1 = bboxes[:, 2::4, :].clamp(0, self.input_img_size[0]-1)
+        by1 = bboxes[:, 3::4, :].clamp(0, self.input_img_size[1]-1)
+
+        bboxes = torch.cat((bx0, by0, bx1, by1), dim=1)
+
+        return bboxes
+
 
     def _get_anchors_parameters(self):
 
-        print('pay attention with the order w,h or h,w')
-        w, h = self.input_img_size
-
-        # print('working with pixels !')
+        # print('pay attention with the order w,h or h,w')
+        # print('WARNING: implementation differ from source_base 1 and source_base 2 !')
         # print('TODO: jogar tudo pra pytorch')
-        anchors_center_width_offset = np.arange(0, w, self.receptive_field_size) + self.receptive_field_size // 2
-        anchors_center_height_offset = np.arange(0, h, self.receptive_field_size) + self.receptive_field_size // 2
+        # print('Ta com -1 no h e w')
+        # print('check all types and dims !')
+        # print('TODO: tentar fazer com broadcast sem ter que gerar a matrix toda')
+        
+        # 16 = anchor base
+        # ah * aw = 16*16 = 256
+        # ah / aw = r -> ah * 1/aw = r
+        # 
+        # ah = r * aw       (2)
+        # r * aw * aw = 256
+        # aw^2 = 256/r
+        # aw = sqrt(256/r)  (1)
+        # ou seja, encontrar ah e aw para que mude o aspect ratio porem nao mude a area coberta pela ancora !
 
-        ws = w // self.receptive_field_size
-        hs = h // self.receptive_field_size
+        n_rows, n_cols = self.receptive_field_size, self.receptive_field_size
 
-        anchors_center_width_offset = np.tile(anchors_center_width_offset.astype(np.float32, copy=False).reshape(1, 1, 1, -1), (hs, 1))
-        anchors_center_height_offset = np.tile(anchors_center_height_offset.astype(np.float32, copy=False).reshape(1, 1, -1, 1), (1, ws))
+        base_anchor_area = n_rows * n_cols
+        base_anchor_center_cols = 0.5 * (n_cols - 1)
+        base_anchor_center_rows = 0.5 * (n_rows - 1)
+
+        anchors = []
+
+        for r in self.anchor_ratios:
+            
+            anchor_n_cols = np.round(np.sqrt(base_anchor_area / r))
+            anchor_n_rows = np.round(anchor_n_cols * r)
+
+            anchor_n_cols_mid = 0.5 * (anchor_n_cols - 1)
+            anchor_n_rows_mid = 0.5 * (anchor_n_rows - 1)
+
+            anchor_col_0 = base_anchor_center_cols - anchor_n_cols_mid
+            anchor_col_1 = base_anchor_center_cols + anchor_n_cols_mid
+
+            anchor_row_0 = base_anchor_center_rows - anchor_n_rows_mid
+            anchor_row_1 = base_anchor_center_rows + anchor_n_rows_mid
+
+            anchors.append([anchor_col_0, anchor_row_0, anchor_col_1, anchor_row_1])
+
+        final_anchors = []
+
+        for a in anchors:
+
+            aw = a[2] - a[0] + 1
+            ah = a[3] - a[1] + 1
+            acw = a[0] + 0.5 * (aw - 1)
+            ach = a[1] + 0.5 * (ah - 1)
+
+            for s in self.anchor_scales:
+                
+                anchor_col_0 = acw - 0.5 * (aw * s - 1.0)
+                anchor_col_1 = acw + 0.5 * (aw * s - 1.0)
+
+                anchor_row_0 = ach - 0.5 * (ah * s - 1.0)
+                anchor_row_1 = ach + 0.5 * (ah * s - 1.0)
+
+                final_anchors.append([anchor_col_0, anchor_row_0, anchor_col_1, anchor_row_1])
+
+        anchors = np.array(final_anchors)
+
+        final_anchors = []
+
+        for a in anchors:
+
+            aw = a[2] - a[0] + 1
+            ah = a[3] - a[1] + 1
+            acw = a[0] + 0.5 * (aw - 1)
+            ach = a[1] + 0.5 * (ah - 1)
+
+            final_anchors.append([acw, ach, aw, ah])
+
+        anchors = np.array(final_anchors, dtype=np.float32)
+        anchors = torch.from_numpy(anchors)
+
+        return anchors #anchors_center_cols_offset, anchors_center_rows_offset, aw, ah
 
 
-        # wtmp = np.array([s / r for r in self.anchor_ratios for s in self.anchor_scales], dtype=np.float32).reshape((1, 1, -1))
-        # htmp = np.array([s * r for r in self.anchor_ratios for s in self.anchor_scales], dtype=np.float32).reshape((1, 1, -1))
+if __name__ == "__main__":
 
-        # w = np.tile(wtmp * self.receptive_field_size, (ws, hs, 1))
-        # h = np.tile(htmp * self.receptive_field_size, (ws, hs, 1))
+    input_img_size = (128, 128)
+    feature_extractor_out_dim = 12
+    receptive_field_size = 16
 
-        # print(anchors_center_width_offset.shape)
-        # print(anchors_center_height_offset.shape)
-        # print(w.shape)
-        # print(h.shape)
-        # exit()
-
-        aw = np.array([s / r for r in self.anchor_ratios for s in self.anchor_scales], dtype=np.float32).reshape((1, -1, 1, 1))
-        ah = np.array([s * r for r in self.anchor_ratios for s in self.anchor_scales], dtype=np.float32).reshape((1, -1, 1, 1))
-
-        anchors_center_width_offset = torch.from_numpy(anchors_center_width_offset)
-        anchors_center_height_offset = torch.from_numpy(anchors_center_height_offset)
-        aw = torch.from_numpy(aw)
-        ah = torch.from_numpy(ah)
-
-        return anchors_center_width_offset, anchors_center_height_offset, aw, ah
-
-
-
-    def _get_anchors(self):
-
-        print('WARNING: implementation differ from source_base 1 and source_base 2 !')
-        print('TODO: jogar tudo pra pytorch')
-        print('Ta com -1 no h e w')
-
-        anchors = np.zeros((self.k, 4))
-        for i in range(len(self.anchor_ratios)):
-            for j in range(len(self.anchor_scales)):
-                h = self.receptive_field_size * self.anchor_scales[j] * self.anchor_ratios[i]
-                w = self.receptive_field_size * self.anchor_scales[j] / self.anchor_ratios[i]
-
-                ph = h / 2.
-                pw = w / 2.
-
-                index = i * len(self.anchor_scales) + j
-                anchors[index, 0] = -(ph - 1)
-                anchors[index, 1] = -(pw - 1)
-                anchors[index, 2] = ph
-                anchors[index, 3] = pw
-        return anchors
-
+    rpn = RPN(input_img_size, feature_extractor_out_dim, receptive_field_size)
 

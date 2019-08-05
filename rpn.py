@@ -68,8 +68,8 @@ class RPN(nn.Module):
 
         # torch.int64 -> index
         # torch.uint8 -> true or false (mask)
-        cond = proposals[0, :, 2] >= 16.0
-        proposals = proposals[:, cond, :]
+        cond = proposals[0, :, 2] >= 16.0  # filtrar bbox pequeno deveria ser depois do clip boxes n !!!! 
+        proposals = proposals[:, cond, :]  # é depois de clip mesmo.. mas ai vai ter que fazer com formato em bbox e n offset 
         prob_object = prob_object[:, cond]
 
         cond = proposals[0, :, 3] >= 16.0

@@ -5,7 +5,7 @@ import numpy as np
 
 class RPN(nn.Module):
 
-    def  __init__(self, input_img_size, feature_extractor_out_dim, receptive_field_size):
+    def  __init__(self, input_img_size, feature_extractor_out_dim, receptive_field_size, device):
     
         super(RPN, self).__init__()
 
@@ -18,7 +18,7 @@ class RPN(nn.Module):
         self.anchor_ratios = [0.5, 1, 2] 
         self.anchor_scales = [8, 16, 32]
         self.k = len(self.anchor_scales) * len(self.anchor_ratios)
-        self.anchors_parameters = self._get_anchors_parameters()
+        self.anchors_parameters = self._get_anchors_parameters().to(device)
         #################################
 
         self.out_dim = 24 # why ? ahco que eu escolhi aleatoriamente
@@ -41,11 +41,11 @@ class RPN(nn.Module):
         # cls_out -> (batch_size, k * 2, 64, 64)
         # para cada ancora, prob de obj e ~obj
 
-        batch_size, _, n_rows, n_cols = cls_out.size()
-        cls_out = cls_out.reshape((batch_size, n_rows, n_cols, self.k, 2))
-        # cls_out -> (batch_size, 64, 64, k, 2)
+        batch_size, _, _, _ = cls_out.size()
+        cls_out = cls_out.permute(0, 2, 3, 1).reshape((batch_size, -1, 2))
+        # cls_out -> (batch_size, 64 * 64 * k, 2)
 
-        prob_object = F.softmax(cls_out, dim=4)[:, :, :, :, 0] # select just the probability to be an object
+        # prob_object = F.softmax(cls_out, dim=4)[:, :, :, :, 0] # select just the probability to be an object
         # prob_object -> (batch_size, 64, 64, k)
 
         ###############################################
@@ -54,30 +54,29 @@ class RPN(nn.Module):
 
         reg_out = self.reg_layer(x)
         # reg_out -> (batch_size, k * 4, 64, 64)
-        
+
+        reg_out = reg_out.permute(0, 2, 3, 1).reshape(batch_size, -1, 4) # acredito que n precise do permute, talvez tirando fique mais rapido pois esse reshape esta mudando o tensor pois n eh contiguo - idem para o clss_out
+        # reg_out -> (batch_size, 64 * 64 * k, 4)
+
         proposals = self._anchors2proposals(reg_out)
         # proposals -> (batch_size, k * 4, 64, 64)
 
         ####################################
 
+        return proposals, cls_out # temporary - for rpn loss the nms is not used
+
+        ###############
+
+#region
         proposals = proposals.permute(0, 2, 3, 1).reshape(batch_size, -1, 4)
         # proposals -> (batch_size, k * 64 * 64, 4)
         
         prob_object = prob_object.view(batch_size, -1)
         # prob_object -> (batch_size, 64 * 64 * k)
 
-        # torch.int64 -> index
-        # torch.uint8 -> true or false (mask)
-        cond = proposals[0, :, 2] >= 16.0  # filtrar bbox pequeno deveria ser depois do clip boxes n !!!! 
-        proposals = proposals[:, cond, :]  # é depois de clip mesmo.. mas ai vai ter que fazer com formato em bbox e n offset 
-        prob_object = prob_object[:, cond]
-
-        cond = proposals[0, :, 3] >= 16.0
-        proposals = proposals[:, cond, :]
-        prob_object = prob_object[:, cond]
-
         proposals = self._offset2bbox(proposals)
         proposals = self._clip_boxes(proposals)
+        proposals, prob_object = self._filter_boxes(proposals, prob_object)
 
         # proposals -> (batch_size, -1, 4)
         # prob_object -> (batch_size, -1)
@@ -144,7 +143,7 @@ class RPN(nn.Module):
         proposals = self._bbox2offset(proposals)
 
         return proposals, prob_object
-
+#endregion
 
     def _bbox2offset(self, bboxes):
         """
@@ -197,24 +196,23 @@ class RPN(nn.Module):
         phi = ahi * exp(thi)
 
         """
-        # ax, ay, aw, ah = self.anchors_parameters
-        ax = self.anchors_parameters[:, 0].view(1, -1, 1, 1)
-        ay = self.anchors_parameters[:, 1].view(1, -1, 1, 1)
-        aw = self.anchors_parameters[:, 2].view(1, -1, 1, 1)
-        ah = self.anchors_parameters[:, 3].view(1, -1, 1, 1)
-    
-        tx = reg_out[:, 0::4, :, :]
-        ty = reg_out[:, 1::4, :, :]
-        tw = reg_out[:, 2::4, :, :]
-        th = reg_out[:, 3::4, :, :]
+        ax = self.anchors_parameters[:, 0]
+        ay = self.anchors_parameters[:, 1]
+        aw = self.anchors_parameters[:, 2]
+        ah = self.anchors_parameters[:, 3]
+
+        tx = reg_out[:, :, 0]
+        ty = reg_out[:, :, 1]
+        tw = reg_out[:, :, 2]
+        th = reg_out[:, :, 3]
 
         px = ax + aw * tx
         py = ay + ah * ty
         pw = aw * torch.exp(tw)
         ph = ah * torch.exp(th)
 
-        proposals = torch.cat((px, py, pw, ph), dim=1)
-
+        proposals = torch.stack((px, py, pw, ph), dim=2).to(reg_out.device) # esse negocio de toda hora jogar pra device ta ruim.. 
+        
         return proposals
 
     
@@ -224,15 +222,34 @@ class RPN(nn.Module):
         bboxes: batch_size, -1, 4
 
         """
+        # assert bboxes.size()[-1] == 4
+        
+        bx0 = bboxes[:, :, 0].clamp(0, self.input_img_size[0]-1)
+        by0 = bboxes[:, :, 1].clamp(0, self.input_img_size[1]-1)
+        bx1 = bboxes[:, :, 2].clamp(0, self.input_img_size[0]-1)
+        by1 = bboxes[:, :, 3].clamp(0, self.input_img_size[1]-1)
 
-        bx0 = bboxes[:, 0::4, :].clamp(0, self.input_img_size[0]-1)
-        by0 = bboxes[:, 1::4, :].clamp(0, self.input_img_size[1]-1)
-        bx1 = bboxes[:, 2::4, :].clamp(0, self.input_img_size[0]-1)
-        by1 = bboxes[:, 3::4, :].clamp(0, self.input_img_size[1]-1)
-
-        bboxes = torch.cat((bx0, by0, bx1, by1), dim=1)
+        bboxes = torch.stack((bx0, by0, bx1, by1), dim=2)
 
         return bboxes
+
+
+    def _filter_boxes(self, bboxes, probs_object, min_size=16.0):
+
+        # torch.int64 -> index
+        # torch.uint8 -> true or false (mask)
+
+        assert bboxes.size()[0] == 1 # implement for batch 1 only.. todo for other batch size
+
+        bx0 = bboxes[:, :, 0]
+        by0 = bboxes[:, :, 1]
+        bx1 = bboxes[:, :, 2]
+        by1 = bboxes[:, :, 3]
+        bw = bx1 - bx0
+        bh = by1 - by0
+        cond = (bw >= min_size) & (bh >= min_size)
+
+        return bboxes[:, cond[0], :], probs_object[:, cond[0]]
 
 
     def _get_anchors_parameters(self):
@@ -254,11 +271,9 @@ class RPN(nn.Module):
         # aw = sqrt(256/r)  (1)
         # ou seja, encontrar ah e aw para que mude o aspect ratio porem nao mude a area coberta pela ancora !
 
-        n_rows, n_cols = self.receptive_field_size, self.receptive_field_size
-
-        base_anchor_area = n_rows * n_cols
-        base_anchor_center_cols = 0.5 * (n_cols - 1)
-        base_anchor_center_rows = 0.5 * (n_rows - 1)
+        base_anchor_area = self.receptive_field_size * self.receptive_field_size
+        base_anchor_center_cols = 0.5 * self.receptive_field_size
+        base_anchor_center_rows = 0.5 * self.receptive_field_size
 
         anchors = []
 
@@ -311,7 +326,20 @@ class RPN(nn.Module):
             final_anchors.append([acw, ach, aw, ah])
 
         anchors = np.array(final_anchors, dtype=np.float32)
-        anchors = torch.from_numpy(anchors)
+        anchors = anchors.reshape(-1)
+
+        all_anchors = np.zeros((36, 64, 64), dtype=np.float32)
+        for k in range(0, 36, 4):
+            for i in range(0, 64):
+                for j in range(0, 64):
+                    all_anchors[k + 0, i, j] = anchors[k + 0] + i * self.receptive_field_size 
+                    all_anchors[k + 1, i, j] = anchors[k + 1] + j * self.receptive_field_size
+                    all_anchors[k + 2, i, j] = anchors[k + 2]
+                    all_anchors[k + 3, i, j] = anchors[k + 3]
+
+        anchors = torch.from_numpy(all_anchors)
+
+        anchors = anchors.permute(1, 2, 0).reshape(-1, 4)
 
         return anchors #anchors_center_cols_offset, anchors_center_rows_offset, aw, ah
 

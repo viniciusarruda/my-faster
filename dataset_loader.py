@@ -15,10 +15,20 @@ class MyDataset(Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
+
+        original_img_size = (256, 256)
+
         with open(csv_file) as f:
             lines = f.readlines()
         data = [l.strip().split(',') for l in lines]
-        data = [(d[0], np.array(float(d[1]))) for d in data]
+        data = [(d[0], np.array([float(d[i]) for i in range(1, len(d)-1)])) for d in data]
+        
+        for i in range(len(data)):
+            data[i][1][0] = (data[i][1][0] / original_img_size[0]) * input_img_size[0]
+            data[i][1][1] = (data[i][1][1] / original_img_size[1]) * input_img_size[1]
+            data[i][1][2] = (data[i][1][2] / original_img_size[0]) * input_img_size[0]
+            data[i][1][3] = (data[i][1][3] / original_img_size[1]) * input_img_size[1]
+
         self.files_annot = data
         self.img_dir = img_dir
         self.input_img_size = input_img_size
@@ -40,6 +50,6 @@ class MyDataset(Dataset):
 def get_dataloader():
 
     input_img_size = (128, 128)
-    dataset = MyDataset(img_dir='dataset/images/', csv_file='dataset/annotations.csv', input_img_size=input_img_size)
+    dataset = MyDataset(img_dir='dataset/mini_day/', csv_file='dataset/mini_day.csv', input_img_size=input_img_size)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
     return dataloader, input_img_size

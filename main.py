@@ -1,11 +1,15 @@
 import torch
+import torch.nn.functional as F
 import numpy as np
 from dataset_loader import get_dataloader
 from feature_extractor import FeatureExtractorNet
 from rpn import RPN
 from roi import ROI
 from classifier_regressor import ClassifierRegressor
-from see_results import see_results
+from see_results import see_results, see_rpn_results, show_training_sample
+from loss import anchor_labels, get_target_distance, compute_rpn_prob_loss
+from PIL import Image
+import time
 
 torch.manual_seed(0)
 torch.backends.cudnn.deterministic = True
@@ -38,45 +42,122 @@ np.random.seed(0)
 
 if __name__ == "__main__":
 
+    device = torch.device("cpu")
+    epochs = 20
+    verbose = False
+
     dataloader, input_img_size = get_dataloader()
 
-    fe_net = FeatureExtractorNet()
-    rpn_net = RPN(input_img_size=input_img_size, feature_extractor_out_dim=fe_net.out_dim, receptive_field_size=fe_net.receptive_field_size)
-    roi_net = ROI(input_img_size=input_img_size)
-    clss_reg = ClassifierRegressor(input_img_size=input_img_size, input_size=7*7*12, n_classes=10 + 1)
+    fe_net = FeatureExtractorNet().to(device)
+    rpn_net = RPN(input_img_size=input_img_size, feature_extractor_out_dim=fe_net.out_dim, receptive_field_size=fe_net.receptive_field_size, device=device).to(device)
+    roi_net = ROI(input_img_size=input_img_size).to(device)
+    clss_reg = ClassifierRegressor(input_img_size=input_img_size, input_size=7*7*12, n_classes=10 + 1).to(device)
 
-    for img, clss in dataloader:
+    params = list(fe_net.parameters()) + list(rpn_net.parameters())
+    optimizer = torch.optim.Adam(params, lr=0.01)
+
+    for net in [fe_net, rpn_net, roi_net, clss_reg]:
+        net.train()
+
+    l = len(dataloader)
+
+    for e in range(1, epochs+1):
+
+        rpn_prob_loss_epoch, rpn_bbox_loss_epoch, loss_epoch = 0, 0, 0
         
-        print('Image size: {}'.format(img.size()))
+        for img, annotation in dataloader:
 
-        features = fe_net.forward(img)
+            img, annotation = img.to(device), annotation.to(device)
 
-        print('Features size: {}'.format(features.size()))
-        
-        proposals, probs_object = rpn_net.forward(features)
+            optimizer.zero_grad()
 
-        print('Proposals size: {}'.format(proposals.size()))
-        print('Probabilities object size: {}'.format(probs_object.size()))
+            # print('Image size: {}'.format(img.size()))
+            # print('Annotation size: {}'.format(annotation.size()))
 
-        rois = roi_net.forward(proposals, features)
+            features = fe_net.forward(img)
 
-        print('Roi size: {}'.format(rois.size()))
+            # print('Features size: {}'.format(features.size()))
+            
+            proposals, probs_object = rpn_net.forward(features)
 
-        # print('Ate aqui tudo certo !')
+            # print('Proposals size: {}'.format(proposals.size()))
+            # print('Probabilities object size: {}'.format(probs_object.size()))
 
-        clss_out, bbox_out = clss_reg.forward(rois, proposals)
+            #####
+            labels = anchor_labels(rpn_net.anchors_parameters, annotation).to(device)
+            rpn_bbox_loss = get_target_distance(proposals, rpn_net.anchors_parameters, annotation, labels)
+            rpn_prob_loss = compute_rpn_prob_loss(probs_object, labels)
+            #####
 
-        print('Clss size: {}'.format(clss_out.size()))
-        print('Bbox size: {}'.format(bbox_out.size()))
+            loss = rpn_prob_loss + rpn_bbox_loss
 
-        # clss_out: (batch_size, n_bboxes)
-        # bbox_out: (batch_size, n_bboxes, 4)
+            rpn_prob_loss_epoch += rpn_prob_loss.item()
+            rpn_bbox_loss_epoch += rpn_bbox_loss.item()
+            loss_epoch += loss.item()
 
-        clss_out_np = clss_out[0, :].detach().numpy()
-        bbox_out_np = bbox_out[0, :, :].detach().numpy()
+#region
+            # with torch.no_grad():
+            #     show_training_sample(img[0, :, :, :].permute(1, 2, 0).numpy().copy(), annotation.numpy().copy())
 
-        img_np = img[0, :, :, :].permute(1, 2, 0).numpy()
+            # for net in [fe_net, rpn_net, roi_net, clss_reg]: net.eval()
+            # with torch.no_grad():
+            #     for i in range(proposals.size()[0]):
+            #         see_rpn_results(img[i, :, :, :].permute(1, 2, 0).detach().numpy().copy(),
+            #                         labels.detach().numpy().copy(), 
+            #                         proposals.detach().numpy().copy(), 
+            #                         annotation.detach().numpy().copy(),
+            #                         rpn_net.anchors_parameters.detach().numpy().copy())
+            # for net in [fe_net, rpn_net, roi_net, clss_reg]: net.train()
+#endregion
 
-        see_results(img_np, clss_out_np, bbox_out_np)
+            loss.backward()
+            optimizer.step()
 
-        exit()
+        print('Epoch {}: rpn_prob_loss: {} + rpn_bbox_loss: {} = {}'.format(e, rpn_prob_loss_epoch / l, rpn_bbox_loss_epoch / l, loss_epoch / l))
+
+        # with torch.no_grad():
+        #     show_training_sample(img[0, :, :, :].permute(1, 2, 0).numpy().copy(), annotation.numpy().copy())
+
+        for net in [fe_net, rpn_net, roi_net, clss_reg]: net.eval()
+        with torch.no_grad():
+            for i in range(proposals.size()[0]):
+                see_rpn_results(img[i, :, :, :].permute(1, 2, 0).detach().numpy().copy(),
+                                labels.detach().numpy().copy(), 
+                                proposals.detach().numpy().copy(), 
+                                F.softmax(probs_object, dim=2).detach().numpy().copy(),
+                                annotation.detach().numpy().copy(),
+                                rpn_net.anchors_parameters.detach().numpy().copy(), e)
+        for net in [fe_net, rpn_net, roi_net, clss_reg]: net.train()
+    
+
+        # TODO:
+        # Treinar com todas as imagens agora, usando mais batch e etc..
+        # fazer o treino completo e correto da RPN !
+
+
+
+
+
+        # Fazer a RPN primeiro ! deixar ela funcional e treinando corretamente para depois continuar !
+
+        # exit()
+
+        # rois = roi_net.forward(proposals, features)
+
+        # print('Roi size: {}'.format(rois.size()))
+
+        # # print('Ate aqui tudo certo !')
+
+        # clss_out, bbox_out = clss_reg.forward(rois, proposals)
+
+        # print('Clss size: {}'.format(clss_out.size()))
+        # print('Bbox size: {}'.format(bbox_out.size()))
+
+        # # clss_out: (batch_size, n_bboxes)
+        # # bbox_out: (batch_size, n_bboxes, 4)
+
+        # # for i in range(clss_out.size()[0]):
+        # #     clss_out_np = clss_out[i, :].detach().numpy()
+        # #     bbox_out_np = bbox_out[i, :, :].detach().numpy()
+        # #     img_np = img[i, :, :, :].permute(1, 2, 0).numpy()
+        # #     see_results(img_np, clss_out_np, bbox_out_np)

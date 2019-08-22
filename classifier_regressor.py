@@ -18,63 +18,135 @@ class ClassifierRegressor(nn.Module):
 
     def forward(self, rois, proposals):
 
-        rois = rois.view(rois.size()[0], rois.size()[1], -1)
+        assert rois.size(0) == 1
 
-        clss_out, proposals_out = [], []
-        batch_size = rois.size()[0]
+        rois = rois.view(rois.size(0), rois.size(1), -1)
 
-        for i in range(batch_size):
+        bi = 0
 
-            i_proposal = proposals[i, :, :]
+        proposals = proposals[bi, :, :]
 
-            x = self.first_layer(rois[i, :, :])
+        x = self.first_layer(rois[bi, :, :])
 
-            clss = self.clss_pred(x)
-            reg = self.reg_pred(x)
+        clss = self.clss_pred(x)
+        reg = self.reg_pred(x)
+        raw_reg = reg[:]
 
-            clss_score = F.softmax(clss, dim=1)
-            clss_idxs = clss_score.argmax(dim=1)
-            clss_score = clss_score[torch.arange(clss_score.size()[0]), clss_idxs]
+        clss_score = F.softmax(clss, dim=1)
+        clss_idxs = clss_score.argmax(dim=1)
+        
+        clss_score = clss_score[torch.arange(clss_score.size(0)), clss_idxs]
 
-            # Filter out background
-            idxs_non_background = clss_idxs != 0
-            clss_score = clss_score[idxs_non_background]
-            reg = reg[idxs_non_background, :]
-            i_proposal = i_proposal[idxs_non_background, :]
+        # Filter out background
+        idxs_non_background = clss_idxs != 0
+        clss_score = clss_score[idxs_non_background]
+        reg = reg[idxs_non_background, :]
+        proposals = proposals[idxs_non_background, :]
 
-            # Filter out lower scores
-            # idxs_non_lower = clss_score >= 0.7 ## I am getting all clss_scores really low
-            idxs_non_lower = clss_score >= 0.01
-            clss_score = clss_score[idxs_non_lower]
-            reg = reg[idxs_non_lower, :]
-            i_proposal = i_proposal[idxs_non_lower, :]
+        # Filter out lower scores
+        # idxs_non_lower = clss_score >= 0.7 ## I am getting all clss_scores really low
+        idxs_non_lower = clss_score >= 0.01
+        clss_score = clss_score[idxs_non_lower]
+        reg = reg[idxs_non_lower, :]
+        proposals = proposals[idxs_non_lower, :]
 
-            # refine the bbox appling the bbox to px, py, pw and ph
-            px = i_proposal[:, 0] + i_proposal[:, 2] * reg[:, 0]
-            py = i_proposal[:, 1] + i_proposal[:, 3] * reg[:, 1]
-            pw = i_proposal[:, 2] * torch.exp(reg[:, 2])
-            ph = i_proposal[:, 3] * torch.exp(reg[:, 3])
+        # refine the bbox appling the bbox to px, py, pw and ph
+        px = proposals[:, 0] + proposals[:, 2] * reg[:, 0]
+        py = proposals[:, 1] + proposals[:, 3] * reg[:, 1]
+        pw = proposals[:, 2] * torch.exp(reg[:, 2])
+        ph = proposals[:, 3] * torch.exp(reg[:, 3])
 
-            i_refined_proposal = torch.stack((px, py, pw, ph), dim=1)
+        refined_proposals = torch.stack((px, py, pw, ph), dim=1)
 
-            # apply NMS
-            i_refined_proposal, clss_score = nms(self.input_img_size, i_refined_proposal, clss_score)
+        refined_proposals = refined_proposals.unsqueeze(0)
+        clss_score = clss_score.unsqueeze(0)
 
-            clss_out.append(clss_score)
-            proposals_out.append(i_refined_proposal)
+        bboxes = self._offset2bbox(refined_proposals)
+        bboxes = self._clip_boxes(bboxes)
 
-        clss_out = torch.stack(clss_out, dim=0)
-        proposals_out = torch.stack(proposals_out, dim=0)
+        bboxes, clss_score = self._filter_boxes(bboxes, clss_score) # ??????? no rpn tem isso, fazer aqui tbm ?
 
-        # proposals_out = _offset2bbox(proposals_out) 
-        bx0 = proposals_out[:, :, 0]
-        by0 = proposals_out[:, :, 1]
-        bx1 = bx0 + proposals_out[:, :, 2] - 1
-        by1 = by0 + proposals_out[:, :, 3] - 1
-        bboxes_out = torch.stack((bx0, by0, bx1, by1), dim=2)
-        #############################################
+        # apply NMS
+        bboxes, clss_score = nms(bboxes, clss_score)
 
-        return clss_out, bboxes_out
+        refined_proposals = self._bbox2offset(bboxes)
+
+        return refined_proposals, raw_reg.unsqueeze(0), clss_score
+
+
+    def _bbox2offset(self, bboxes):
+        """
+        bboxes: batch_size, -1, 4
+        proposals: batch_size, -1, 4
+
+        """
+
+        bx0 = bboxes[:, :, 0]
+        by0 = bboxes[:, :, 1]
+        bx1 = bboxes[:, :, 2]
+        by1 = bboxes[:, :, 3]
+
+        ox = bx0
+        oy = by0
+        ow = bx1 - bx0 + 1
+        oh = by1 - by0 + 1
+
+        offsets = torch.stack((ox, oy, ow, oh), dim=2)
+
+        return offsets
+
+    
+    def _offset2bbox(self, proposals):
+        """
+        proposals: batch_size, -1, 4
+        bboxes: batch_size, -1, 4
+
+        """
+
+        bx0 = proposals[:, :, 0]
+        by0 = proposals[:, :, 1]
+        bx1 = bx0 + proposals[:, :, 2] - 1
+        by1 = by0 + proposals[:, :, 3] - 1
+
+        bboxes = torch.stack((bx0, by0, bx1, by1), dim=2)
+
+        return bboxes
+
+    
+    def _clip_boxes(self, bboxes):
+        """
+        bboxes: batch_size, -1, 4
+        bboxes: batch_size, -1, 4
+
+        """
+        # assert bboxes.size()[-1] == 4
+        
+        bx0 = bboxes[:, :, 0].clamp(0, self.input_img_size[0]-1)
+        by0 = bboxes[:, :, 1].clamp(0, self.input_img_size[1]-1)
+        bx1 = bboxes[:, :, 2].clamp(0, self.input_img_size[0]-1)
+        by1 = bboxes[:, :, 3].clamp(0, self.input_img_size[1]-1)
+
+        bboxes = torch.stack((bx0, by0, bx1, by1), dim=2)
+
+        return bboxes
+
+
+    def _filter_boxes(self, bboxes, probs_object, min_size=16.0):
+
+        # torch.int64 -> index
+        # torch.uint8 -> true or false (mask)
+
+        assert bboxes.size()[0] == 1 # implement for batch 1 only.. todo for other batch size
+
+        bx0 = bboxes[:, :, 0]
+        by0 = bboxes[:, :, 1]
+        bx1 = bboxes[:, :, 2]
+        by1 = bboxes[:, :, 3]
+        bw = bx1 - bx0
+        bh = by1 - by0
+        cond = (bw >= min_size) & (bh >= min_size)
+
+        return bboxes[:, cond[0], :], probs_object[:, cond[0]]
 
 
 

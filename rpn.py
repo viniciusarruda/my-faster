@@ -2,6 +2,8 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import numpy as np
+from nms import nms
+import time
 
 class RPN(nn.Module):
 
@@ -45,9 +47,6 @@ class RPN(nn.Module):
         cls_out = cls_out.permute(0, 2, 3, 1).reshape((batch_size, -1, 2))
         # cls_out -> (batch_size, 64 * 64 * k, 2)
 
-        # prob_object = F.softmax(cls_out, dim=4)[:, :, :, :, 0] # select just the probability to be an object
-        # prob_object -> (batch_size, 64, 64, k)
-
         ###############################################
 
         ### Compute the object proposals ###
@@ -63,87 +62,30 @@ class RPN(nn.Module):
 
         ####################################
 
-        return proposals, cls_out # temporary - for rpn loss the nms is not used
+        ####################################
 
-        ###############
+        bboxes = self._offset2bbox(proposals)
+        bboxes = self._clip_boxes(bboxes)
 
-#region
-        proposals = proposals.permute(0, 2, 3, 1).reshape(batch_size, -1, 4)
-        # proposals -> (batch_size, k * 64 * 64, 4)
-        
-        prob_object = prob_object.view(batch_size, -1)
+        prob_object = F.softmax(cls_out, dim=2)[:, :, 0]
         # prob_object -> (batch_size, 64 * 64 * k)
 
-        proposals = self._offset2bbox(proposals)
-        proposals = self._clip_boxes(proposals)
-        proposals, prob_object = self._filter_boxes(proposals, prob_object)
-
-        # proposals -> (batch_size, -1, 4)
+        bboxes, prob_object = self._filter_boxes(bboxes, prob_object)
+        # bboxes -> (batch_size, -1, 4)
         # prob_object -> (batch_size, -1)
-        
-        # ATE AQUI TUDO CERTO !
 
-        ### NMS ###
-        # TODO: Remove the for loop somehow !
-        batch_proposals = []
-        batch_prob_object = []
-        for i in range(batch_size):
+        bboxes, probs_object = nms(bboxes, prob_object)
+        # bboxes -> (batch_size, -1, 4)
+        # prob_object -> (batch_size, -1)
 
-            i_proposals_o = proposals[i, :, :]
-            i_prob_object_o = prob_object[i, :]
+        filtered_proposals = self._bbox2offset(bboxes)
+        # filtered_proposals -> (batch_size, -1, 4)
 
-            idxs = torch.argsort(i_prob_object_o, descending=True)
-            n_proposals = 600
-            idxs = idxs[:n_proposals]
+        ####################################
 
-            i_proposals = i_proposals_o[idxs, :]
-            i_prob_object = i_prob_object_o[idxs]
+        return proposals, cls_out, filtered_proposals, probs_object
 
-            k = 0
-            while k < i_proposals.size()[0]:
 
-                ### Remove iou > 0.7 ###
-                x0_0, y0_0, x1_0, y1_0 = i_proposals[k, 0], i_proposals[k, 1], i_proposals[k, 2], i_proposals[k, 3]
-                area_0 = (x1_0 - x0_0 + 1) * (y1_0 - y0_0 + 1)
-                assert x1_0 > x0_0 and y1_0 > y0_0 # just to ensure.. but this is dealt before I think
-
-                marked_to_keep = []
-
-                for j in range(k+1, i_proposals.size()[0]):
-
-                    x0_j, y0_j, x1_j, y1_j = i_proposals[j, 0], i_proposals[j, 1], i_proposals[j, 2], i_proposals[j, 3]
-                    
-                    x0 = torch.max(x0_0, x0_j)
-                    y0 = torch.max(y0_0, y0_j)
-                    x1 = torch.min(x1_0, x1_j)
-                    y1 = torch.min(y1_0, y1_j)
-                    
-                    intersection = torch.clamp(x1 - x0 + 1, min=0) * torch.clamp(y1 - y0 + 1, min=0)
-                    area_j = (x1_j - x0_j + 1) * (y1_j - y0_j + 1)
-
-                    union = area_0 + area_j - intersection
-                    iou = intersection / union
-
-                    if iou <= 0.7:
-                        marked_to_keep.append(j)
-
-                # keep
-                i_proposals = torch.cat((i_proposals[:k+1, :], i_proposals[marked_to_keep, :]), dim=0)
-                i_prob_object = torch.cat((i_prob_object[:k+1], i_prob_object[marked_to_keep]), dim=0)
-                k += 1
-            
-            batch_proposals.append(i_proposals)
-            batch_prob_object.append(i_prob_object)
-
-        ### end of NMS ###
-
-        proposals = torch.stack(batch_proposals, dim=0)
-        prob_object = torch.stack(batch_prob_object, dim=0)
-
-        proposals = self._bbox2offset(proposals)
-
-        return proposals, prob_object
-#endregion
 
     def _bbox2offset(self, bboxes):
         """

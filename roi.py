@@ -15,8 +15,8 @@ class ROI(nn.Module):
 
     def forward(self, proposals, features):
 
-        fx = features.size()[2] / self.input_img_size[0]
-        fy = features.size()[3] / self.input_img_size[1]
+        fx = features.size(2) / self.input_img_size[0]  # ja sei a priori
+        fy = features.size(3) / self.input_img_size[1]  # ja sei a priori
 
         x = proposals[:, :, 0] * fx
         y = proposals[:, :, 1] * fy
@@ -27,16 +27,16 @@ class ROI(nn.Module):
 
         batch_rois = []
 
-        for i in range(roi.size()[0]):
+        for i in range(roi.size(0)):
             rois = []
-            for k in range(roi.size()[1]):
+            for k in range(roi.size(1)):
 
                 x = roi[i, k, 0].long() # long -> torch.int64
                 y = roi[i, k, 1].long()
                 w = roi[i, k, 2].long()
                 h = roi[i, k, 3].long()
 
-                roi_feature = features[i, :, x:x+w, y:y+h][None, :]  # NAO DESISTE !!!
+                roi_feature = features[i, :, x:x+w, y:y+h].unsqueeze(0)
 
                 roi_feature_interpolated = F.interpolate(roi_feature, size=(14, 14),  mode='bilinear', align_corners=True)
 
@@ -48,5 +48,7 @@ class ROI(nn.Module):
             batch_rois.append(rois)
 
         rois = torch.stack(batch_rois, dim=0)
-                
+
         return rois
+
+ # NAO DESISTE !!!

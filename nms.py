@@ -1,76 +1,60 @@
 import torch
 
-def nms(input_img_size, i_proposals_o, i_prob_object_o):
+def nms(bboxes, probs_object):
 
-    # i_proposals_o = _offset2bbox(i_proposals_o) 
-    bx0 = i_proposals_o[:, 0]
-    by0 = i_proposals_o[:, 1]
-    bx1 = bx0 + i_proposals_o[:, 2] - 1
-    by1 = by0 + i_proposals_o[:, 3] - 1
-    i_proposals_o = torch.stack((bx0, by0, bx1, by1), dim=1)
-    # print('lembrar de subtrair os -1, tirei pra testar')                 ### a partir daqui proposals eh bbox.. trocar nome da variavel..
-    #############################################
+    assert bboxes.size(0) == 1
 
-    # i_proposals_o = _clip_boxes(i_proposals_o)
-    bx0 = i_proposals_o[:, 0].clamp(0, input_img_size[0]-1)
-    by0 = i_proposals_o[:, 1].clamp(0, input_img_size[1]-1)
-    bx1 = i_proposals_o[:, 2].clamp(0, input_img_size[0]-1)
-    by1 = i_proposals_o[:, 3].clamp(0, input_img_size[1]-1)
-    i_proposals_o = torch.stack((bx0, by0, bx1, by1), dim=1)
-    ############################################
+    # for bi in range(bboxes.size(0)):
+        # bboxes, probs_object = _nms(bboxes[bi, :, :], probs_object[bi, :])
+    bi = 0
+    bboxes, probs_object = _nms(bboxes[bi, :, :], probs_object[bi, :])
 
-    idxs = torch.argsort(i_prob_object_o, descending=True)
-    n_proposals = 600
-    idxs = idxs[:n_proposals]
+    return bboxes.unsqueeze(0), probs_object.unsqueeze(0) # unsqueeze for simulating a batch of 1   
 
-    i_proposals = i_proposals_o[idxs, :]
-    i_prob_object = i_prob_object_o[idxs]
+
+def _nms(bboxes, probs_object):
+
+    # print(bboxes.size())
+    # print(probs_object.size())
+
+    idxs = torch.argsort(probs_object, descending=True)
+
+    # print(idxs.size())
+    n_bboxes = 600
+    idxs = idxs[:n_bboxes]
+    # print(idxs.size())
+
+    bboxes = bboxes[idxs, :]
+    probs_object = probs_object[idxs]
+
+    # print(bboxes.size())
+    # print(probs_object.size())
 
     k = 0
-    while k < i_proposals.size()[0]:
+    while k < bboxes.size(0):
 
         ### Remove iou > 0.7 ###
-        x0_0, y0_0, x1_0, y1_0 = i_proposals[k, 0], i_proposals[k, 1], i_proposals[k, 2], i_proposals[k, 3]
+        x0_0, y0_0, x1_0, y1_0 = bboxes[k, 0], bboxes[k, 1], bboxes[k, 2], bboxes[k, 3]
         area_0 = (x1_0 - x0_0 + 1) * (y1_0 - y0_0 + 1)
-        assert x1_0 > x0_0 and y1_0 > y0_0 # just to ensure.. but this is dealt before I think
+        assert x1_0 > x0_0 and y1_0 > y0_0 # just to ensure.. but this is dealt before I think... I am shure !!
 
-        marked_to_keep = []
+        # print(k+1, bboxes.size(0)-1)
 
-        for j in range(k+1, i_proposals.size()[0]):
+        x0 = torch.max(x0_0, bboxes[k+1:, 0])
+        y0 = torch.max(y0_0, bboxes[k+1:, 1])
+        x1 = torch.min(x1_0, bboxes[k+1:, 2])
+        y1 = torch.min(y1_0, bboxes[k+1:, 3])     
 
-            x0_j, y0_j, x1_j, y1_j = i_proposals[j, 0], i_proposals[j, 1], i_proposals[j, 2], i_proposals[j, 3]
-            
-            x0 = torch.max(x0_0, x0_j)
-            y0 = torch.max(y0_0, y0_j)
-            x1 = torch.min(x1_0, x1_j)
-            y1 = torch.min(y1_0, y1_j)
-            
-            intersection = torch.clamp(x1 - x0 + 1, min=0) * torch.clamp(y1 - y0 + 1, min=0)
-            area_j = (x1_j - x0_j + 1) * (y1_j - y0_j + 1)
+        intersection = torch.clamp(x1 - x0 + 1, min=0) * torch.clamp(y1 - y0 + 1, min=0)  
+        area_j = (bboxes[k+1:, 2] - bboxes[k+1:, 0] + 1) * (bboxes[k+1:, 3] - bboxes[k+1:, 1] + 1) 
 
-            union = area_0 + area_j - intersection
-            iou = intersection / union
-            
-            if iou <= 0.7:
-                marked_to_keep.append(j)
+        union = area_0 + area_j - intersection
+        iou = intersection / union
 
-        # keep
-        i_proposals = torch.cat((i_proposals[:k+1, :], i_proposals[marked_to_keep, :]), dim=0)
-        i_prob_object = torch.cat((i_prob_object[:k+1], i_prob_object[marked_to_keep]), dim=0)
+        keep_idxs = iou <= 0.7
+
+        bboxes = torch.cat((bboxes[:k+1, :], bboxes[k+1:, :][keep_idxs, :]), dim=0)
+        probs_object = torch.cat((probs_object[:k+1], probs_object[k+1:][keep_idxs]), dim=0)
         k += 1
 
-    # proposals = _bbox2offset(proposals)
-    bx0 = i_proposals[:, 0]
-    by0 = i_proposals[:, 1]
-    bx1 = i_proposals[:, 2]
-    by1 = i_proposals[:, 3]
-
-    ox = bx0
-    oy = by0
-    ow = bx1 - bx0 + 1
-    oh = by1 - by0 + 1
-
-    i_proposals = torch.stack((ox, oy, ow, oh), dim=1)
-    #####################################
-
-    return i_proposals, i_prob_object
+    return bboxes, probs_object

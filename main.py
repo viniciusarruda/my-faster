@@ -7,7 +7,7 @@ from rpn import RPN
 from roi import ROI
 from classifier_regressor import ClassifierRegressor
 from see_results import see_results, see_rpn_results, show_training_sample
-from loss import anchor_labels, get_target_distance, compute_rpn_prob_loss, get_target_distance2
+from loss import anchor_labels, get_target_distance, compute_rpn_prob_loss, get_target_distance2, get_target_mask, compute_cls_reg_prob_loss
 from PIL import Image
 import time
 
@@ -59,7 +59,7 @@ def main():
     fe_net = FeatureExtractorNet().to(device)
     rpn_net = RPN(input_img_size=input_img_size, feature_extractor_out_dim=fe_net.out_dim, receptive_field_size=fe_net.receptive_field_size, device=device).to(device)
     roi_net = ROI(input_img_size=input_img_size).to(device)
-    clss_reg = ClassifierRegressor(input_img_size=input_img_size, input_size=7*7*12, n_classes=10 + 1).to(device)
+    clss_reg = ClassifierRegressor(input_img_size=input_img_size, input_size=7*7*12, n_classes=1).to(device)
 
     params = list(fe_net.parameters()) + list(rpn_net.parameters()) + list(roi_net.parameters()) + list(clss_reg.parameters())
     optimizer = torch.optim.Adam(params, lr=0.01)
@@ -72,7 +72,7 @@ def main():
     for e in range(1, epochs+1):
 
         rpn_prob_loss_epoch, rpn_bbox_loss_epoch, rpn_loss_epoch = 0, 0, 0
-        clss_reg_bbox_loss_epoch, clss_reg_loss_epoch = 0, 0
+        clss_reg_prob_loss_epoch, clss_reg_bbox_loss_epoch, clss_reg_loss_epoch = 0, 0, 0
         
         for img, annotation in dataloader:
 
@@ -101,22 +101,27 @@ def main():
             rois = roi_net.forward(filtered_proposals, features)
             # print('Roi size: {}'.format(rois.size()))
             #
-            refined_proposals, raw_reg, clss_score = clss_reg.forward(rois, filtered_proposals)
+            raw_reg, raw_cls = clss_reg.forward(rois, filtered_proposals)
             # print('Refined proposals size: {}'.format(refined_proposals.size()))
             # print('Clss size: {}'.format(clss_score.size()))
 
 
             #####
             ## Compute .. loss ##
-            clss_reg_bbox_loss = get_target_distance2(raw_reg, filtered_proposals, annotation)
+            # target_mask = get_target_mask(filtered_proposals, annotation)
+            fg_mask, cls_mask = get_target_mask(filtered_proposals, annotation)
+            clss_reg_bbox_loss = get_target_distance2(raw_reg, filtered_proposals, annotation, fg_mask)
+            clss_reg_prob_loss = compute_cls_reg_prob_loss(raw_cls, cls_mask)
             # labels = rpn_proposals_labels(filtered_proposals, annotation).to(device) # filtered mesmo ?
             # rpn_bbox_loss = get_target_distance(proposals, rpn_net.anchors_parameters, annotation, labels)
             # rpn_prob_loss = compute_rpn_prob_loss(cls_out, labels)
             #####
 
-            clss_reg_loss = clss_reg_bbox_loss
+            clss_reg_loss = clss_reg_prob_loss + clss_reg_bbox_loss
 
+            clss_reg_prob_loss_epoch += clss_reg_prob_loss.item()
             clss_reg_bbox_loss_epoch += clss_reg_bbox_loss.item()
+            clss_reg_loss_epoch += clss_reg_loss.item()
 
             # ta no meio mas depois organizar.. ##############################################################
 
@@ -133,8 +138,18 @@ def main():
             optimizer.step()
 
         print('Epoch {}: rpn_prob_loss: {} + rpn_bbox_loss: {} = {}'.format(e, rpn_prob_loss_epoch / l, rpn_bbox_loss_epoch / l, rpn_loss_epoch / l))
-        print('       : clss_reg_bbox_loss: {}'.format(clss_reg_bbox_loss_epoch / l))
+        print('       : clss_reg_prob_loss: {} + clss_reg_bbox_loss: {} = {}'.format(clss_reg_prob_loss_epoch / l, clss_reg_bbox_loss_epoch / l, clss_reg_loss_epoch / l))
         print()
+
+        # TODO:
+        # olhar aquele old forward em cls-reg, implementar
+        # a segunda parte separadamente como inferencia
+        # e plotar o resultadofinal..
+        # analisar.. 
+
+
+
+
 
         # with torch.no_grad():
         #     show_training_sample(img[0, :, :, :].permute(1, 2, 0).numpy().copy(), annotation.numpy().copy())

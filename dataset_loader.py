@@ -29,6 +29,8 @@ class MyDataset(Dataset):
             data[i][1][2] = (data[i][1][2] / original_img_size[0]) * input_img_size[0]
             data[i][1][3] = (data[i][1][3] / original_img_size[1]) * input_img_size[1]
 
+        _inplace_adjust_bbox2offset(data)
+
         self.files_annot = data
         self.img_dir = img_dir
         self.input_img_size = input_img_size
@@ -50,6 +52,19 @@ class MyDataset(Dataset):
 def get_dataloader():
 
     input_img_size = (128, 128)
-    dataset = MyDataset(img_dir='dataset/mini_day/', csv_file='dataset/mini_day.csv', input_img_size=input_img_size)
+    dataset = MyDataset(img_dir='dataset/one_day/', csv_file='dataset/one_day.csv', input_img_size=input_img_size)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
     return dataloader, input_img_size
+
+
+def _inplace_adjust_bbox2offset(bbox_data_list):
+    """
+    proposals: batch_size, -1, 4
+    bboxes: batch_size, -1, 4
+
+    """
+
+    for _, bbox in bbox_data_list:
+
+        bbox[2] = bbox[2] - bbox[0] + 1
+        bbox[3] = bbox[3] - bbox[1] + 1    

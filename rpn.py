@@ -20,7 +20,8 @@ class RPN(nn.Module):
         self.anchor_ratios = [0.5, 1, 2] 
         self.anchor_scales = [8, 16, 32]
         self.k = len(self.anchor_scales) * len(self.anchor_ratios)
-        self.anchors_parameters = self._get_anchors_parameters().to(device)
+        self.anchors_parameters, self.valid_anchors = self._get_anchors_parameters()
+        self.anchors_parameters, self.valid_anchors = self.anchors_parameters.to(device), self.valid_anchors.to(device)
         #################################
 
         self.out_dim = 24 # why ? ahco que eu escolhi aleatoriamente
@@ -57,7 +58,7 @@ class RPN(nn.Module):
         reg_out = reg_out.permute(0, 2, 3, 1).reshape(batch_size, -1, 4) # acredito que n precise do permute, talvez tirando fique mais rapido pois esse reshape esta mudando o tensor pois n eh contiguo - idem para o clss_out
         # reg_out -> (batch_size, 64 * 64 * k, 4)
 
-        proposals = self._anchors2proposals(reg_out)
+        proposals, cls_out = self._anchors2proposals(reg_out, cls_out)
         # proposals -> (batch_size, k * 4, 64, 64)
 
         ####################################
@@ -67,16 +68,16 @@ class RPN(nn.Module):
         bboxes = self._offset2bbox(proposals)
         bboxes = self._clip_boxes(bboxes)
 
-        prob_object = F.softmax(cls_out, dim=2)[:, :, 0]
-        # prob_object -> (batch_size, 64 * 64 * k)
+        probs_object = F.softmax(cls_out, dim=2)[:, :, 0]
+        # probs_object -> (batch_size, 64 * 64 * k)
 
-        bboxes, prob_object = self._filter_boxes(bboxes, prob_object)
+        bboxes, probs_object = self._filter_boxes(bboxes, probs_object)
         # bboxes -> (batch_size, -1, 4)
-        # prob_object -> (batch_size, -1)
+        # probs_object -> (batch_size, -1)
 
-        bboxes, probs_object = nms(bboxes, prob_object)
+        bboxes, probs_object = nms(bboxes, probs_object)
         # bboxes -> (batch_size, -1, 4)
-        # prob_object -> (batch_size, -1)
+        # probs_object -> (batch_size, -1)
 
         filtered_proposals = self._bbox2offset(bboxes)
         # filtered_proposals -> (batch_size, -1, 4)
@@ -126,7 +127,7 @@ class RPN(nn.Module):
         return bboxes
 
 
-    def _anchors2proposals(self, reg_out):
+    def _anchors2proposals(self, reg_out, cls_out):
         """
         anchors: (N, 4) ndarray of float : anchors
         reg_out: (self.k, 4) ndarray of float
@@ -138,15 +139,17 @@ class RPN(nn.Module):
         phi = ahi * exp(thi)
 
         """
-        ax = self.anchors_parameters[:, 0]
-        ay = self.anchors_parameters[:, 1]
-        aw = self.anchors_parameters[:, 2]
-        ah = self.anchors_parameters[:, 3]
+        cls_out = cls_out[:, self.valid_anchors, :]
 
-        tx = reg_out[:, :, 0]
-        ty = reg_out[:, :, 1]
-        tw = reg_out[:, :, 2]
-        th = reg_out[:, :, 3]
+        ax = self.anchors_parameters[self.valid_anchors, 0]
+        ay = self.anchors_parameters[self.valid_anchors, 1]
+        aw = self.anchors_parameters[self.valid_anchors, 2]
+        ah = self.anchors_parameters[self.valid_anchors, 3]
+
+        tx = reg_out[:, self.valid_anchors, 0]
+        ty = reg_out[:, self.valid_anchors, 1]
+        tw = reg_out[:, self.valid_anchors, 2]
+        th = reg_out[:, self.valid_anchors, 3]
 
         px = ax + aw * tx
         py = ay + ah * ty
@@ -155,7 +158,7 @@ class RPN(nn.Module):
 
         proposals = torch.stack((px, py, pw, ph), dim=2).to(reg_out.device) # esse negocio de toda hora jogar pra device ta ruim.. 
         
-        return proposals
+        return proposals, cls_out
 
     
     def _clip_boxes(self, bboxes):
@@ -187,8 +190,8 @@ class RPN(nn.Module):
         by0 = bboxes[:, :, 1]
         bx1 = bboxes[:, :, 2]
         by1 = bboxes[:, :, 3]
-        bw = bx1 - bx0
-        bh = by1 - by0
+        bw = bx1 - bx0 + 1
+        bh = by1 - by0 + 1
         cond = (bw >= min_size) & (bh >= min_size)
 
         return bboxes[:, cond[0], :], probs_object[:, cond[0]]
@@ -270,10 +273,10 @@ class RPN(nn.Module):
         anchors = np.array(final_anchors, dtype=np.float32)
         anchors = anchors.reshape(-1)
 
-        all_anchors = np.zeros((36, 64, 64), dtype=np.float32)
+        all_anchors = np.zeros((36, 32, 32), dtype=np.float32)
         for k in range(0, 36, 4):
-            for i in range(0, 64):
-                for j in range(0, 64):
+            for i in range(0, 32):
+                for j in range(0, 32):
                     all_anchors[k + 0, i, j] = anchors[k + 0] + i * self.receptive_field_size 
                     all_anchors[k + 1, i, j] = anchors[k + 1] + j * self.receptive_field_size
                     all_anchors[k + 2, i, j] = anchors[k + 2]
@@ -283,7 +286,25 @@ class RPN(nn.Module):
 
         anchors = anchors.permute(1, 2, 0).reshape(-1, 4)
 
-        return anchors #anchors_center_cols_offset, anchors_center_rows_offset, aw, ah
+        valid_mask = np.zeros(anchors.size(0), dtype=np.uint8)
+        for i in range(anchors.size(0)):
+
+            acw = anchors[i, 0]
+            ach = anchors[i, 1]
+            aw = anchors[i, 2]
+            ah = anchors[i, 3]
+
+            a0 = acw - 0.5 * (aw - 1)
+            a1 = ach - 0.5 * (ah - 1)
+            a2 = aw + a0 - 1
+            a3 = ah + a1 - 1
+
+            if a0 >= 0 and a1 >= 0 and a2 <= 127 and a3 <= 127:
+                valid_mask[i] = 1
+
+        valid_mask = torch.from_numpy(valid_mask)
+
+        return anchors, valid_mask #anchors_center_cols_offset, anchors_center_rows_offset, aw, ah
 
 
 if __name__ == "__main__":

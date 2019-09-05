@@ -29,8 +29,10 @@ def smooth_l1(x, sigma=3):
     return ret
 
 
-def anchor_labels(anchors, gts, negative_threshold=0.3, positive_threshold=0.7):
+def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_threshold=0.7):
     # tem como simplificar e otimizar..
+
+    anchors = anchors[valid_anchors, :]
 
     batch_size = gts.size()[0]
     mask = torch.zeros(batch_size, anchors.size(0))
@@ -38,19 +40,19 @@ def anchor_labels(anchors, gts, negative_threshold=0.3, positive_threshold=0.7):
     for bi in range(batch_size):
 
         anchors_bbox = torch.zeros(anchors.size(), dtype=anchors.dtype, device=anchors.device)
-        anchors_bbox[:, 0] = anchors[:, 0] - anchors[:, 2] * 0.5  # como proceder com o lance do -1 ou +1 nesse caso ? na conversão dos bbox2offset e vice versa ?
-        anchors_bbox[:, 1] = anchors[:, 1] - anchors[:, 3] * 0.5  # cuidadooooooooo p anchor eh assim, mas para proposal n .. caso for gerar label para proposal..
-        anchors_bbox[:, 2] = anchors_bbox[:, 0] + anchors[:, 2]
-        anchors_bbox[:, 3] = anchors_bbox[:, 1] + anchors[:, 3]
+        anchors_bbox[:, 0] = anchors[:, 0] - 0.5 * (anchors[:, 2] - 1)  # como proceder com o lance do -1 ou +1 nesse caso ? na conversão dos bbox2offset e vice versa ?
+        anchors_bbox[:, 1] = anchors[:, 1] - 0.5 * (anchors[:, 3] - 1)  # cuidadooooooooo p anchor eh assim, mas para proposal n .. caso for gerar label para proposal..
+        anchors_bbox[:, 2] = anchors_bbox[:, 0] + anchors[:, 2] - 1
+        anchors_bbox[:, 3] = anchors_bbox[:, 1] + anchors[:, 3] - 1
 
         anchors_bbox_area = anchors[:, 2] * anchors[:, 3]
 
-        gt_area = (gts[bi, 2] - gts[bi, 0] + 1) * (gts[bi, 3] - gts[bi, 1] + 1)
+        gt_area = gts[bi, 2] * gts[bi, 3]
 
         x0 = torch.max(anchors_bbox[:, 0], gts[bi, 0])
         y0 = torch.max(anchors_bbox[:, 1], gts[bi, 1])
-        x1 = torch.min(anchors_bbox[:, 2], gts[bi, 2])
-        y1 = torch.min(anchors_bbox[:, 3], gts[bi, 3])
+        x1 = torch.min(anchors_bbox[:, 2], gts[bi, 0] + gts[bi, 2] - 1)
+        y1 = torch.min(anchors_bbox[:, 3], gts[bi, 1] + gts[bi, 3] - 1)
 
         intersection = torch.clamp(x1 - x0 + 1, min=0) * torch.clamp(y1 - y0 + 1, min=0)
 
@@ -141,7 +143,9 @@ def parametrize_bbox(bbox, a_bbox):
     return tx, ty, tw, th
 
 
-def get_target_distance(proposals, anchors, gts, labels):
+def get_target_distance(proposals, anchors, valid_anchors, gts, labels):
+
+    anchors = anchors[valid_anchors, :]
 
     assert labels.size(0) == 1 # implemented for batch size 1
 
@@ -189,6 +193,14 @@ def compute_rpn_prob_loss(probs_object, labels):
 
     assert labels.size(0) == 1 # implemented for batch size 1
     idxs = labels != -1.0  # considering all cares ! Just positive and negative samples !
+
+    print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
+    print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
+    aqui eu tenho 285 labels negativas e 2 positivas (objeto vs n objeto)
+    tentar pegar aleatoriamente apenas 2 negativos para treinar em conjunto comos 2 positivos..
+    pq acredito que tendo melhor score.. o nms depois vai selecionar melhor os possiveis proposals para a proxima fase !
+    # exit()
+
     # without normalization to simplify as said in the paper
     # todo so, reduction='mean'
     # this has effect to consider the class 0 -> negative sample

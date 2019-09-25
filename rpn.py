@@ -3,6 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 import numpy as np
 from nms import nms
+from bbox_utils import bbox2offset, offset2bbox, clip_boxes, filter_boxes
 import time
 
 class RPN(nn.Module):
@@ -17,6 +18,7 @@ class RPN(nn.Module):
         ###############################################
 
         ### Anchor related attributes ###
+        # acredito que ao implementar a resnet como feature extractor pode melhorar colocando mais ratios e scales, ficou ruim do jeito que esta
         self.anchor_ratios = [1] #[0.5, 1, 2] 
         self.anchor_scales = [8] #[8, 16, 32]
         self.k = len(self.anchor_scales) * len(self.anchor_ratios)
@@ -66,13 +68,13 @@ class RPN(nn.Module):
 
         ####################################
 
-        bboxes = self._offset2bbox(proposals)
-        bboxes = self._clip_boxes(bboxes)
+        bboxes = offset2bbox(proposals)
+        bboxes = clip_boxes(bboxes, self.input_img_size)
 
         probs_object = F.softmax(cls_out, dim=2)[:, :, 1] # it is 1 and not zero ! 
         # probs_object -> (batch_size, 64 * 64 * k)
 
-        bboxes, probs_object = self._filter_boxes(bboxes, probs_object)
+        bboxes, probs_object = filter_boxes(bboxes, probs_object)
         # bboxes -> (batch_size, -1, 4)
         # probs_object -> (batch_size, -1)
 
@@ -80,52 +82,12 @@ class RPN(nn.Module):
         # bboxes -> (batch_size, -1, 4)
         # probs_object -> (batch_size, -1)
 
-        filtered_proposals = self._bbox2offset(bboxes)
+        filtered_proposals = bbox2offset(bboxes)
         # filtered_proposals -> (batch_size, -1, 4)
 
         ####################################
 
         return proposals, cls_out, filtered_proposals, probs_object
-
-
-
-    def _bbox2offset(self, bboxes):
-        """
-        bboxes: batch_size, -1, 4
-        proposals: batch_size, -1, 4
-
-        """
-
-        bx0 = bboxes[:, :, 0]
-        by0 = bboxes[:, :, 1]
-        bx1 = bboxes[:, :, 2]
-        by1 = bboxes[:, :, 3]
-
-        ox = bx0
-        oy = by0
-        ow = bx1 - bx0 + 1
-        oh = by1 - by0 + 1
-
-        offsets = torch.stack((ox, oy, ow, oh), dim=2)
-
-        return offsets
-
-
-    def _offset2bbox(self, proposals):
-        """
-        proposals: batch_size, -1, 4
-        bboxes: batch_size, -1, 4
-
-        """
-
-        bx0 = proposals[:, :, 0]
-        by0 = proposals[:, :, 1]
-        bx1 = bx0 + proposals[:, :, 2] - 1
-        by1 = by0 + proposals[:, :, 3] - 1
-
-        bboxes = torch.stack((bx0, by0, bx1, by1), dim=2)
-
-        return bboxes
 
 
     def _anchors2proposals(self, reg_out, cls_out):
@@ -161,42 +123,6 @@ class RPN(nn.Module):
         proposals = torch.stack((px, py, pw, ph), dim=2).to(reg_out.device) # esse negocio de toda hora jogar pra device ta ruim.. 
         
         return proposals, cls_out
-
-    
-    def _clip_boxes(self, bboxes):
-        """
-        bboxes: batch_size, -1, 4
-        bboxes: batch_size, -1, 4
-
-        """
-        # assert bboxes.size()[-1] == 4
-        
-        bx0 = bboxes[:, :, 0].clamp(0, self.input_img_size[0]-1)
-        by0 = bboxes[:, :, 1].clamp(0, self.input_img_size[1]-1)
-        bx1 = bboxes[:, :, 2].clamp(0, self.input_img_size[0]-1)
-        by1 = bboxes[:, :, 3].clamp(0, self.input_img_size[1]-1)
-
-        bboxes = torch.stack((bx0, by0, bx1, by1), dim=2)
-
-        return bboxes
-
-
-    def _filter_boxes(self, bboxes, probs_object, min_size=16.0):
-
-        # torch.int64 -> index
-        # torch.uint8 -> true or false (mask)
-
-        assert bboxes.size()[0] == 1 # implement for batch 1 only.. todo for other batch size
-
-        bx0 = bboxes[:, :, 0]
-        by0 = bboxes[:, :, 1]
-        bx1 = bboxes[:, :, 2]
-        by1 = bboxes[:, :, 3]
-        bw = bx1 - bx0 + 1
-        bh = by1 - by0 + 1
-        cond = (bw >= min_size) & (bh >= min_size)
-
-        return bboxes[:, cond[0], :], probs_object[:, cond[0]]
 
 
     def _get_anchors_parameters(self):
@@ -307,14 +233,4 @@ class RPN(nn.Module):
         valid_mask = torch.from_numpy(valid_mask)
 
         return anchors, valid_mask #anchors_center_cols_offset, anchors_center_rows_offset, aw, ah
-
-
-if __name__ == "__main__":
-
-    input_img_size = (128, 128)
-    feature_extractor_out_dim = 12
-    receptive_field_size = 16
-    device = torch.device("cpu")
-
-    rpn = RPN(input_img_size, feature_extractor_out_dim, receptive_field_size, device)
 

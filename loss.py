@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 from dataset_loader import get_dataloader
 from rpn import RPN
+from bbox_utils import offset2bbox
 import numpy as np
 
 
@@ -24,7 +25,7 @@ def smooth_l1(x, sigma=3):
     return ret
 
 
-def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.65, positive_threshold=0.7): # era 0.3 no negative..
+def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_threshold=0.7): # era 0.3 no negative..
     # tem como simplificar e otimizar..
 
     anchors = anchors[valid_anchors, :]
@@ -70,7 +71,7 @@ def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0
     cls_mask = torch.zeros(batch_size, filtered_proposals.size(1))
     fg_mask = torch.zeros(batch_size, filtered_proposals.size(1))
 
-    filtered_bbox = _offset2bbox(filtered_proposals)
+    filtered_bbox = offset2bbox(filtered_proposals)
     
     for bi in range(batch_size):
 
@@ -110,27 +111,22 @@ def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0
         # I dont know how the real Faster R-CNN leads with this issue.
         # I just handled it in this way to keep implementing, but I have not found in any materials how to handle it correctly 
         # TODO THIS IS A MUST !
-        if (iou > low_threshold).sum() == 0.0:
-            cls_mask[bi, torch.argmax(iou)] = 0.0 # put at least an easy case as a hardy background case to have a class loss
+        # if (iou > low_threshold).sum() == 0.0:
+            # cls_mask[bi, torch.argmax(iou)] = 0.0 # put at least an easy case as a hardy background case to have a class loss
+            # input('CLASS MASK WITHOUT ANY VALUE, TYPE ANYTHING TO CONTINUE TO SEE WHAT WILL HAPPEN:')
+
+        # this print is to help debug the TODO above.. in case of break of code, explore here !
+        # print((fg_mask == 0).nonzero().size())
+        # print((fg_mask == 1).nonzero().size())
+
+        # print((cls_mask == -1).nonzero().size())
+        # print((cls_mask == 0).nonzero().size())
+        # print((cls_mask == 1).nonzero().size())
+
+        # exit()
 
     return fg_mask, cls_mask
 
-# already implemented, do not repeat in final code !
-def _offset2bbox(proposals):
-    """
-    proposals: batch_size, -1, 4
-    bboxes: batch_size, -1, 4
-
-    """
-
-    bx0 = proposals[:, :, 0]
-    by0 = proposals[:, :, 1]
-    bx1 = bx0 + proposals[:, :, 2] - 1
-    by1 = by0 + proposals[:, :, 3] - 1
-
-    bboxes = torch.stack((bx0, by0, bx1, by1), dim=2)
-
-    return bboxes
 
 
 def parametrize_bbox(bbox, a_bbox):
@@ -266,33 +262,14 @@ def compute_cls_reg_prob_loss(probs_object, labels):
     # todo so, reduction='mean'
     # this has effect to consider the class 0 -> background
     #                             the class 1 -> car
+
+    if labels[idxs].long().size(0) == 0:
+        # TODO
+        print('CLASS MASK WITHOUT ANY VALUE, IT WILL CONTINUE BUT SHOULD SEE THIS')
+        return torch.zeros(1)
+
     prob_loss = F.cross_entropy(probs_object[idxs, :], labels[idxs].long(), reduction='sum') 
     return prob_loss # / d
-
-
-if __name__ == '__main__':
-
-    torch.manual_seed(0)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(0)
-
-    input_img_size = (128, 128)
-    feature_extractor_out_dim = 12
-    receptive_field_size = 16
-    dataloader, input_img_size = get_dataloader()
-
-    rpn = RPN(input_img_size, feature_extractor_out_dim, receptive_field_size)
-
-    for img, annotation in dataloader:
-
-        labels = anchor_labels(rpn.anchors_parameters, annotation)
-
-        ret = get_target_distance(rpn.anchors_parameters, annotation, labels)
-
-        print(ret)
-
-        exit()
 
     
 # NAO DESISTE !!!!!!!!!!!!!!!!!

@@ -6,10 +6,9 @@ from feature_extractor import FeatureExtractorNet
 from rpn import RPN
 from roi import ROI
 from classifier_regressor import ClassifierRegressor
-from see_results import see_results, see_rpn_results, show_training_sample, see_final_results, see_rpn_final_results, show_anchors, show_masked_anchors, LossViz
+from see_results import see_rpn_results, show_training_sample, see_final_results, see_rpn_final_results, show_anchors, show_masked_anchors, LossViz
 from loss import anchor_labels, get_target_distance, compute_rpn_prob_loss, get_target_distance2, get_target_mask, compute_cls_reg_prob_loss
 from PIL import Image
-import time
 
 torch.manual_seed(0)
 torch.backends.cudnn.deterministic = True
@@ -19,6 +18,7 @@ np.random.seed(0)
 # TODO
 # FIXME 
 # BUG 
+# NOTE
 
 #####################################
 
@@ -35,18 +35,17 @@ np.random.seed(0)
 
 #####################################
 
-# TODO: Assert the forward pass.
-# TODO: Implement the loss and assert its corectness
-# TODO: Implement the backward and assert its correctness
-
-start_time_count = None
-
-def start_time():
-    global start_time_count
-    start_time_count = time.time()
-
-def end_time(msg):
-    print(msg, time.time() - start_time_count)
+# NOTE: For each modification, test and do not move until obtain the same anterior result (or better) 
+# DONE: Assert the forward pass.
+# DODE: Implement the loss and assert its corectness
+# DONE: Implement the backward and assert its correctness
+# TODO: Organize the code
+# TODO: Increase the size of the input image
+# TODO: Increase the number of images in the training set
+# TODO: Implement the resnet as feature extractor
+# TODO: Fix the parameters for the new feature extractor
+# TODO: Implement the training strategy correctly
+# TODO: Use the newest PyTorch version 
 
 def main():
 
@@ -93,6 +92,13 @@ def main():
             # print('Proposals size: {}'.format(proposals.size()))
             # print('Probabilities object size: {}'.format(probs_object.size()))
 
+            rois = roi_net.forward(filtered_proposals, features)
+            # print('Roi size: {}'.format(rois.size()))
+            #
+            raw_reg, raw_cls = clss_reg.forward(rois)
+            # print('Refined proposals size: {}'.format(refined_proposals.size()))
+            # print('Clss size: {}'.format(clss_score.size()))
+
             #####
             ## Compute RPN loss ##
             labels = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation).to(device)
@@ -101,31 +107,13 @@ def main():
             rpn_prob_loss = compute_rpn_prob_loss(cls_out, labels)
             #####
 
-            # ta no meio mas depois organizar.. ##############################################################
-            rois = roi_net.forward(filtered_proposals, features)
-            # print('Roi size: {}'.format(rois.size()))
-            #
-            raw_reg, raw_cls = clss_reg.forward(rois)
-            # print('Refined proposals size: {}'.format(refined_proposals.size()))
-            # print('Clss size: {}'.format(clss_score.size()))
-
-
             #####
-            ## Compute .. loss ##
-            # target_mask = get_target_mask(filtered_proposals, annotation)
+            ## Compute class_reg loss ##
             fg_mask, cls_mask = get_target_mask(filtered_proposals, annotation)
             clss_reg_bbox_loss = get_target_distance2(raw_reg, filtered_proposals, annotation, fg_mask)
             clss_reg_prob_loss = compute_cls_reg_prob_loss(raw_cls, cls_mask)
             refined_proposals, clss_score = clss_reg.infer_bboxes(filtered_proposals, raw_reg, raw_cls)
             #####
-
-            clss_reg_loss = clss_reg_prob_loss + clss_reg_bbox_loss
-
-            clss_reg_prob_loss_epoch += clss_reg_prob_loss.item()
-            clss_reg_bbox_loss_epoch += clss_reg_bbox_loss.item()
-            clss_reg_loss_epoch += clss_reg_loss.item()
-
-            # ta no meio mas depois organizar.. ##############################################################
 
             rpn_loss = 10 * rpn_prob_loss + rpn_bbox_loss
 
@@ -133,9 +121,14 @@ def main():
             rpn_bbox_loss_epoch += rpn_bbox_loss.item()
             rpn_loss_epoch += rpn_loss.item()
 
+            clss_reg_loss = clss_reg_prob_loss + clss_reg_bbox_loss
+
+            clss_reg_prob_loss_epoch += clss_reg_prob_loss.item()
+            clss_reg_bbox_loss_epoch += clss_reg_bbox_loss.item()
+            clss_reg_loss_epoch += clss_reg_loss.item()
+
             total_loss = rpn_loss + clss_reg_loss
 
-            # rpn_loss.backward()
             total_loss.backward()
 
             optimizer.step()

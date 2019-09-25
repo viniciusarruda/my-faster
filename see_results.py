@@ -4,22 +4,6 @@ import numpy as np
 import json
 import matplotlib.pyplot as plt
 
-def see_results(img_np, clss_out_np, bbox_out_np):
-
-    img_np *= 255
-    real = Image.fromarray(img_np.astype(np.uint8))
-
-    real_draw = ImageDraw.Draw(real)
-
-    for i in range(clss_out_np.shape[0]):
-
-        print(clss_out_np[i])
-        real_draw.rectangle([bbox_out_np[i, 0], bbox_out_np[i, 1], bbox_out_np[i, 2], bbox_out_np[i, 3]], outline='red')
-
-    real.show()
-
-    # input()
-
 
 def see_rpn_results(img_np, labels_np, proposals_np, probs_object_np, annotation_np, anchors_np, valid_anchors_np, e):
 
@@ -157,40 +141,6 @@ def show_anchors(anchors_np, valid_anchors_np):
     real.show()
     exit()
 
-# old from above !
-# def show_anchors(anchors_np, valid_anchors_np):
-
-#     offset = 128
-#     img_np = np.zeros((128 + 2*offset, 128 + 2*offset, 3))
-#     real = Image.fromarray(img_np.astype(np.uint8))
-#     real_draw = ImageDraw.Draw(real)
-#     real_draw.rectangle([offset - 1, offset - 1, offset + 127 + 1, offset + 127 + 1], outline='yellow') # atencao para o -1 e +1 e seu significado !
-
-#     c = 0
-
-#     for i in range(valid_anchors_np.shape[0]):
-
-#         acw = anchors_np[i, 0]
-#         ach = anchors_np[i, 1]
-#         aw = anchors_np[i, 2]
-#         ah = anchors_np[i, 3]
-
-#         a0 = acw - 0.5 * (aw - 1)
-#         a1 = ach - 0.5 * (ah - 1)
-#         a2 = aw + a0 - 1
-#         a3 = ah + a1 - 1
-
-#         if valid_anchors_np[i] == 1:
-#             c += 1
-#             real_draw.rectangle([offset + a0, offset + a1, offset + a2, offset + a3], outline='magenta')
-#         # else:
-#             # real_draw.rectangle([offset + a0, offset + a1, offset + a2, offset + a3], outline='white')
-#             # real_draw.point([offset + anchors_np[i, 0], offset + anchors_np[i, 1]], fill='white')
-    
-#     real.show()
-#     print(c)
-#     exit()
-
 
 def show_masked_anchors(anchors_np, valid_anchors_np, mask_np, annotation_np):
 
@@ -237,37 +187,6 @@ def show_masked_anchors(anchors_np, valid_anchors_np, mask_np, annotation_np):
             real.save('output/anchors/{}/{}.jpg'.format(mask_name, i))
 
     exit()
-
-# def show_anchors(anchors_np):
-
-#     offset = 128
-#     img_np = np.zeros((128 + 2*offset, 128 + 2*offset, 3))
-#     real = Image.fromarray(img_np.astype(np.uint8))
-#     real_draw = ImageDraw.Draw(real)
-#     real_draw.rectangle([offset - 1, offset - 1, offset + 127 + 1, offset + 127 + 1], outline='yellow') # atencao para o -1 e +1 e seu significado !
-
-#     c = 0
-
-#     for i in range(anchors_np.shape[0]):
-
-#         acw = anchors_np[i, 0]
-#         ach = anchors_np[i, 1]
-#         aw = anchors_np[i, 2]
-#         ah = anchors_np[i, 3]
-
-#         a0 = acw - 0.5 * (aw - 1)
-#         a1 = ach - 0.5 * (ah - 1)
-#         a2 = aw + a0 - 1
-#         a3 = ah + a1 - 1
-
-#         if a0 >= 0 and a1 >= 0 and a2 <= 127 and a3 <= 127:
-#             c += 1
-#             real_draw.rectangle([offset + a0, offset + a1, offset + a2, offset + a3], outline='magenta')
-#             real_draw.point([offset + anchors_np[i, 0], offset + anchors_np[i, 1]], fill='white')
-    
-#     real.show()
-#     # print(c)
-#     # exit()
 
 
 def _offset2bbox(proposals):

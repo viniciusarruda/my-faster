@@ -19,6 +19,7 @@ def _nms(bboxes, probs_object):
 
     idxs = torch.argsort(probs_object, descending=True)
 
+    # colocando com 100 ou 600 piorou ! acredito que ao implementar a resnet como feature extractor pode melhorar aqui
     n_bboxes = 30 #100 #600
     idxs = idxs[:n_bboxes]
     # print(idxs.size())
@@ -60,35 +61,4 @@ def _nms(bboxes, probs_object):
 
     return bboxes, probs_object
 
-
-if __name__ == "__main__":
-
-    bboxes = torch.zeros(1, 3, 4)
-    probs_object = torch.zeros(1, 3)
-
-    bboxes[0, 0, 0] = 1.0
-    bboxes[0, 0, 1] = 1.0
-    bboxes[0, 0, 2] = 5.0
-    bboxes[0, 0, 3] = 5.0
-
-    bboxes[0, 1, 0] = 2
-    bboxes[0, 1, 1] = 2
-    bboxes[0, 1, 2] = 5.0
-    bboxes[0, 1, 3] = 5.0
-
-    bboxes[0, 2, 0] = 3
-    bboxes[0, 2, 1] = 3
-    bboxes[0, 2, 2] = 5.0
-    bboxes[0, 2, 3] = 5.0
-
-    probs_object[0, 0] = 0.5
-    
-    probs_object[0, 1] = 0.4
-
-    probs_object[0, 2] = 0.3
-
-    bboxes, probs_object = nms(bboxes, probs_object)
-
-    print(bboxes)
-    print(probs_object)
     

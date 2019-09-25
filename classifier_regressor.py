@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+from bbox_utils import bbox2offset, offset2bbox, clip_boxes, filter_boxes
 
 from nms import nms
 
@@ -66,104 +67,15 @@ class ClassifierRegressor(nn.Module):
         refined_proposals = refined_proposals.unsqueeze(0)
         clss_score = clss_score.unsqueeze(0)
 
-        bboxes = self._offset2bbox(refined_proposals)
-        bboxes = self._clip_boxes(bboxes)
+        bboxes = offset2bbox(refined_proposals)
+        bboxes = clip_boxes(bboxes, self.input_img_size)
 
-        bboxes, clss_score = self._filter_boxes(bboxes, clss_score) # ??????? no rpn tem isso, fazer aqui tbm ?
+        bboxes, clss_score = filter_boxes(bboxes, clss_score) # ??????? no rpn tem isso, fazer aqui tbm ?
 
         # apply NMS
         bboxes, clss_score = nms(bboxes, clss_score)
 
-        refined_proposals = self._bbox2offset(bboxes)
+        refined_proposals = bbox2offset(bboxes)
 
         return refined_proposals, clss_score
-
-
-    def _bbox2offset(self, bboxes):
-        """
-        bboxes: batch_size, -1, 4
-        proposals: batch_size, -1, 4
-
-        """
-
-        bx0 = bboxes[:, :, 0]
-        by0 = bboxes[:, :, 1]
-        bx1 = bboxes[:, :, 2]
-        by1 = bboxes[:, :, 3]
-
-        ox = bx0
-        oy = by0
-        ow = bx1 - bx0 + 1
-        oh = by1 - by0 + 1
-
-        offsets = torch.stack((ox, oy, ow, oh), dim=2)
-
-        return offsets
-
     
-    def _offset2bbox(self, proposals):
-        """
-        proposals: batch_size, -1, 4
-        bboxes: batch_size, -1, 4
-
-        """
-
-        bx0 = proposals[:, :, 0]
-        by0 = proposals[:, :, 1]
-        bx1 = bx0 + proposals[:, :, 2] - 1
-        by1 = by0 + proposals[:, :, 3] - 1
-
-        bboxes = torch.stack((bx0, by0, bx1, by1), dim=2)
-
-        return bboxes
-
-    
-    def _clip_boxes(self, bboxes):
-        """
-        bboxes: batch_size, -1, 4
-        bboxes: batch_size, -1, 4
-
-        """
-        # assert bboxes.size()[-1] == 4
-        
-        bx0 = bboxes[:, :, 0].clamp(0, self.input_img_size[0]-1)
-        by0 = bboxes[:, :, 1].clamp(0, self.input_img_size[1]-1)
-        bx1 = bboxes[:, :, 2].clamp(0, self.input_img_size[0]-1)
-        by1 = bboxes[:, :, 3].clamp(0, self.input_img_size[1]-1)
-
-        bboxes = torch.stack((bx0, by0, bx1, by1), dim=2)
-
-        return bboxes
-
-
-    def _filter_boxes(self, bboxes, probs_object, min_size=16.0):
-
-        # torch.int64 -> index
-        # torch.uint8 -> true or false (mask)
-
-        assert bboxes.size()[0] == 1 # implement for batch 1 only.. todo for other batch size
-
-        bx0 = bboxes[:, :, 0]
-        by0 = bboxes[:, :, 1]
-        bx1 = bboxes[:, :, 2]
-        by1 = bboxes[:, :, 3]
-        bw = bx1 - bx0
-        bh = by1 - by0
-        cond = (bw >= min_size) & (bh >= min_size)
-
-        return bboxes[:, cond[0], :], probs_object[:, cond[0]]
-
-
-
-if __name__ == "__main__":
-
-    torch.manual_seed(0)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
-    clss_reg = ClassifierRegressor(input_img_size=(128,128), input_size=7*7*12, n_classes=10 + 1)
-
-    rois = torch.rand(1, 5, 12, 7, 7)
-    proposals = torch.rand(1, 5, 4)
-
-    print(clss_reg.forward(rois, proposals))

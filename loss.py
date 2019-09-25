@@ -4,11 +4,6 @@ from dataset_loader import get_dataloader
 from rpn import RPN
 import numpy as np
 
-torch.manual_seed(0)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-np.random.seed(0)
-
 
 def smooth_l1(x, sigma=3):
 
@@ -29,7 +24,7 @@ def smooth_l1(x, sigma=3):
     return ret
 
 
-def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_threshold=0.7):
+def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.65, positive_threshold=0.7): # era 0.3 no negative..
     # tem como simplificar e otimizar..
 
     anchors = anchors[valid_anchors, :]
@@ -81,12 +76,18 @@ def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0
 
         proposals_bbox_area = filtered_proposals[bi, :, 2] * filtered_proposals[bi, :, 3]
 
-        gt_area = (gts[bi, 2] - gts[bi, 0] + 1) * (gts[bi, 3] - gts[bi, 1] + 1)
+        # gt_area = (gts[bi, 2] - gts[bi, 0] + 1) * (gts[bi, 3] - gts[bi, 1] + 1)
+        gt_area = gts[bi, 2] * gts[bi, 3]
+
+        # x0 = torch.max(filtered_bbox[bi, :, 0], gts[bi, 0])
+        # y0 = torch.max(filtered_bbox[bi, :, 1], gts[bi, 1])
+        # x1 = torch.min(filtered_bbox[bi, :, 2], gts[bi, 2])
+        # y1 = torch.min(filtered_bbox[bi, :, 3], gts[bi, 3])
 
         x0 = torch.max(filtered_bbox[bi, :, 0], gts[bi, 0])
         y0 = torch.max(filtered_bbox[bi, :, 1], gts[bi, 1])
-        x1 = torch.min(filtered_bbox[bi, :, 2], gts[bi, 2])
-        y1 = torch.min(filtered_bbox[bi, :, 3], gts[bi, 3])
+        x1 = torch.min(filtered_bbox[bi, :, 2], gts[bi, 0] + gts[bi, 2] - 1)
+        y1 = torch.min(filtered_bbox[bi, :, 3], gts[bi, 1] + gts[bi, 3] - 1)
 
         intersection = torch.clamp(x1 - x0 + 1, min=0) * torch.clamp(y1 - y0 + 1, min=0)
 
@@ -194,11 +195,59 @@ def compute_rpn_prob_loss(probs_object, labels):
     assert labels.size(0) == 1 # implemented for batch size 1
     idxs = labels != -1.0  # considering all cares ! Just positive and negative samples !
 
-    print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
-    print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
-    aqui eu tenho 285 labels negativas e 2 positivas (objeto vs n objeto)
-    tentar pegar aleatoriamente apenas 2 negativos para treinar em conjunto comos 2 positivos..
-    pq acredito que tendo melhor score.. o nms depois vai selecionar melhor os possiveis proposals para a proxima fase !
+    # print(probs_object.size())
+    # print(labels.size())
+    # print(idxs.size())
+    # print(probs_object[idxs, :].size())
+    # print(labels[idxs].size())
+    # print(probs_object[idxs, :][0].reshape((1, 2)).size())
+    # print(labels[idxs][0].reshape((1)).size())
+    
+    # print(probs_object[idxs, :][0].reshape((1, 2)))
+    # print(labels[idxs][0].reshape((1)).long())
+
+    # print(probs_object[idxs, :])
+    # print(probs_object[0, 30:40, :])
+    # print(probs_object[idxs, :])
+    # exit()
+
+    # ps = F.softmax(probs_object[idxs, :][0].reshape((1, 2)), dim=1)
+    # print(ps)
+    # print(probs_object[idxs, :][0].reshape((1, 2)))
+    # print(labels[idxs][0].reshape((1)).long())
+
+    # ps = F.softmax(probs_object[idxs, :][1].reshape((1, 2)), dim=1)
+    # print(ps)
+    # print(probs_object[idxs, :][1].reshape((1, 2)))
+    # print(labels[idxs][1].reshape((1)).long())
+
+    # loss = F.cross_entropy(probs_object[idxs, :][0].reshape((1, 2)), labels[idxs][0].reshape((1)).long(), reduction='sum')
+
+    # print(ps.size())
+    # print(loss.size())
+    # print(loss)
+
+    # print(probs_object[0, 0, :])
+    # print(ps[0, 0, :])
+
+    # exit()
+    # print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
+    # print((idxs == 1).sum(), (idxs == 0).sum())
+    # exit()
+
+    # idxs_zero = torch.nonzero(labels == 0)
+    # to_zero = torch.randperm(285)
+    # # idxs_zero = idxs_zero[to_zero][:283, 1]
+    # idxs_zero = idxs_zero[to_zero][:torch.randint(250, 283, (1,))[0], 1] 
+    # idxs[0, idxs_zero] = 0
+
+    # print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
+    # print((idxs == 1).sum(), (idxs == 0).sum())
+    # exit()
+
+    # aqui eu tenho 285 labels negativas e 2 positivas (objeto vs n objeto)
+    # tentar pegar aleatoriamente apenas 2 negativos para treinar em conjunto comos 2 positivos..
+    # pq acredito que tendo melhor score.. o nms depois vai selecionar melhor os possiveis proposals para a proxima fase !
     # exit()
 
     # without normalization to simplify as said in the paper
@@ -222,6 +271,11 @@ def compute_cls_reg_prob_loss(probs_object, labels):
 
 
 if __name__ == '__main__':
+
+    torch.manual_seed(0)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(0)
 
     input_img_size = (128, 128)
     feature_extractor_out_dim = 12

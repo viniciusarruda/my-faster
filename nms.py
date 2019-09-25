@@ -19,7 +19,7 @@ def _nms(bboxes, probs_object):
 
     idxs = torch.argsort(probs_object, descending=True)
 
-    n_bboxes = 100 #600
+    n_bboxes = 30 #100 #600
     idxs = idxs[:n_bboxes]
     # print(idxs.size())
 
@@ -50,9 +50,9 @@ def _nms(bboxes, probs_object):
         union = area_0 + area_j - intersection
         iou = intersection / union
 
-        print(iou)
+        # print(iou)
         keep_idxs = iou <= 0.7
-        print(keep_idxs)
+        # print(keep_idxs)
 
         bboxes = torch.cat((bboxes[:k+1, :], bboxes[k+1:, :][keep_idxs, :]), dim=0)
         probs_object = torch.cat((probs_object[:k+1], probs_object[k+1:][keep_idxs]), dim=0)

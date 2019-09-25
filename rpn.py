@@ -17,14 +17,15 @@ class RPN(nn.Module):
         ###############################################
 
         ### Anchor related attributes ###
-        self.anchor_ratios = [0.5, 1, 2] 
-        self.anchor_scales = [8, 16, 32]
+        self.anchor_ratios = [1] #[0.5, 1, 2] 
+        self.anchor_scales = [8] #[8, 16, 32]
         self.k = len(self.anchor_scales) * len(self.anchor_ratios)
         self.anchors_parameters, self.valid_anchors = self._get_anchors_parameters()
         self.anchors_parameters, self.valid_anchors = self.anchors_parameters.to(device), self.valid_anchors.to(device)
         #################################
 
         self.out_dim = 24 # why ? ahco que eu escolhi aleatoriamente
+        
         self.conv_rpn = nn.Conv2d(in_channels=feature_extractor_out_dim, out_channels=self.out_dim, kernel_size=3, stride=1, padding=1, bias=True)
 
         self.cls_layer = nn.Conv2d(self.out_dim, self.k * 2, kernel_size=1, stride=1, padding=0)
@@ -68,7 +69,7 @@ class RPN(nn.Module):
         bboxes = self._offset2bbox(proposals)
         bboxes = self._clip_boxes(bboxes)
 
-        probs_object = F.softmax(cls_out, dim=2)[:, :, 0]
+        probs_object = F.softmax(cls_out, dim=2)[:, :, 1] # it is 1 and not zero ! 
         # probs_object -> (batch_size, 64 * 64 * k)
 
         bboxes, probs_object = self._filter_boxes(bboxes, probs_object)
@@ -139,6 +140,7 @@ class RPN(nn.Module):
         phi = ahi * exp(thi)
 
         """
+
         cls_out = cls_out[:, self.valid_anchors, :]
 
         ax = self.anchors_parameters[self.valid_anchors, 0]
@@ -273,8 +275,9 @@ class RPN(nn.Module):
         anchors = np.array(final_anchors, dtype=np.float32)
         anchors = anchors.reshape(-1)
 
-        all_anchors = np.zeros((36, 32, 32), dtype=np.float32)
-        for k in range(0, 36, 4):
+        n_anchors = 4 * len(self.anchor_ratios) * len(self.anchor_scales)
+        all_anchors = np.zeros((n_anchors, 32, 32), dtype=np.float32)
+        for k in range(0, n_anchors, 4):
             for i in range(0, 32):
                 for j in range(0, 32):
                     all_anchors[k + 0, i, j] = anchors[k + 0] + i * self.receptive_field_size 
@@ -283,7 +286,6 @@ class RPN(nn.Module):
                     all_anchors[k + 3, i, j] = anchors[k + 3]
 
         anchors = torch.from_numpy(all_anchors)
-
         anchors = anchors.permute(1, 2, 0).reshape(-1, 4)
 
         valid_mask = np.zeros(anchors.size(0), dtype=np.uint8)
@@ -312,6 +314,7 @@ if __name__ == "__main__":
     input_img_size = (128, 128)
     feature_extractor_out_dim = 12
     receptive_field_size = 16
+    device = torch.device("cpu")
 
-    rpn = RPN(input_img_size, feature_extractor_out_dim, receptive_field_size)
+    rpn = RPN(input_img_size, feature_extractor_out_dim, receptive_field_size, device)
 

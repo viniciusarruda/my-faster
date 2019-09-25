@@ -6,7 +6,7 @@ from feature_extractor import FeatureExtractorNet
 from rpn import RPN
 from roi import ROI
 from classifier_regressor import ClassifierRegressor
-from see_results import see_results, see_rpn_results, show_training_sample, see_final_results, see_rpn_final_results, show_anchors
+from see_results import see_results, see_rpn_results, show_training_sample, see_final_results, see_rpn_final_results, show_anchors, show_masked_anchors, LossViz
 from loss import anchor_labels, get_target_distance, compute_rpn_prob_loss, get_target_distance2, get_target_mask, compute_cls_reg_prob_loss
 from PIL import Image
 import time
@@ -50,9 +50,10 @@ def end_time(msg):
 
 def main():
 
+    lv = LossViz()
+    
     device = torch.device("cpu")
-    epochs = 200
-    verbose = False
+    epochs = 1000
 
     dataloader, input_img_size = get_dataloader()
 
@@ -95,6 +96,7 @@ def main():
             #####
             ## Compute RPN loss ##
             labels = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation).to(device)
+            # show_masked_anchors(rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), labels.detach().numpy().copy(), annotation.detach().numpy().copy())
             rpn_bbox_loss = get_target_distance(proposals, rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation, labels)
             rpn_prob_loss = compute_rpn_prob_loss(cls_out, labels)
             #####
@@ -103,7 +105,7 @@ def main():
             rois = roi_net.forward(filtered_proposals, features)
             # print('Roi size: {}'.format(rois.size()))
             #
-            raw_reg, raw_cls = clss_reg.forward(rois, filtered_proposals)
+            raw_reg, raw_cls = clss_reg.forward(rois)
             # print('Refined proposals size: {}'.format(refined_proposals.size()))
             # print('Clss size: {}'.format(clss_score.size()))
 
@@ -125,7 +127,7 @@ def main():
 
             # ta no meio mas depois organizar.. ##############################################################
 
-            rpn_loss = rpn_prob_loss + rpn_bbox_loss
+            rpn_loss = 10 * rpn_prob_loss + rpn_bbox_loss
 
             rpn_prob_loss_epoch += rpn_prob_loss.item()
             rpn_bbox_loss_epoch += rpn_bbox_loss.item()
@@ -138,31 +140,12 @@ def main():
 
             optimizer.step()
 
+        lv.record(e, rpn_prob_loss_epoch / l, rpn_bbox_loss_epoch / l, rpn_loss_epoch / l, clss_reg_prob_loss_epoch / l, clss_reg_bbox_loss_epoch / l, clss_reg_loss_epoch / l)
         print('Epoch {}: rpn_prob_loss: {} + rpn_bbox_loss: {} = {}'.format(e, rpn_prob_loss_epoch / l, rpn_bbox_loss_epoch / l, rpn_loss_epoch / l))
         print('       : clss_reg_prob_loss: {} + clss_reg_bbox_loss: {} = {}'.format(clss_reg_prob_loss_epoch / l, clss_reg_bbox_loss_epoch / l, clss_reg_loss_epoch / l))
         print()
 
-        # TODO:
-        # olhar aquele old forward em cls-reg, implementar
-        # a segunda parte separadamente como inferencia
-        # e plotar o resultadofinal..
-        # analisar...
-
-        # with torch.no_grad():
-        #     show_training_sample(img[0, :, :, :].permute(1, 2, 0).numpy().copy(), annotation.numpy().copy())
-
-        # for net in [fe_net, rpn_net, roi_net, clss_reg]: net.eval()
-        # with torch.no_grad():
-        #     for i in range(proposals.size()[0]):
-        #         see_rpn_results(img[i, :, :, :].permute(1, 2, 0).detach().numpy().copy(),
-        #                         labels.detach().numpy().copy(), 
-        #                         proposals.detach().numpy().copy(), 
-        #                         F.softmax(probs_object, dim=2).detach().numpy().copy(),
-        #                         annotation.detach().numpy().copy(),
-        #                         rpn_net.anchors_parameters.detach().numpy().copy(), e)
-        # for net in [fe_net, rpn_net, roi_net, clss_reg]: net.train()
-
-        if e % 50 == 0:
+        if e % 10 == 0:
             for net in [fe_net, rpn_net, roi_net, clss_reg]: net.eval()
             with torch.no_grad():
 
@@ -189,12 +172,8 @@ def main():
                                     annotation.detach().numpy().copy(),
                                     e)
             for net in [fe_net, rpn_net, roi_net, clss_reg]: net.train()
-
-        # # for i in range(clss_out.size()[0]):
-        # #     clss_out_np = clss_out[i, :].detach().numpy()
-        # #     bbox_out_np = bbox_out[i, :, :].detach().numpy()
-        # #     img_np = img[i, :, :, :].permute(1, 2, 0).numpy()
-        # #     see_results(img_np, clss_out_np, bbox_out_np)
+    
+    lv.save()
 
 
 if __name__ == "__main__":

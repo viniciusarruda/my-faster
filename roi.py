@@ -30,7 +30,7 @@ class ROI(nn.Module):
 
         for i in range(roi.size(0)):
             rois = []
-            for k in range(roi.size(1)):uneven
+            for k in range(roi.size(1)):
 
                 x = roi[i, k, 0].long() # long -> torch.int64
                 y = roi[i, k, 1].long()

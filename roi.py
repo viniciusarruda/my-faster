@@ -13,6 +13,7 @@ class ROI(nn.Module):
         self.input_img_size = input_img_size
 
 
+    # so segui os tutoriais, mas isso é ROIPool, ROIAlign, ROI ??
     def forward(self, proposals, features):
 
         fx = features.size(2) / self.input_img_size[0]  # ja sei a priori
@@ -29,7 +30,7 @@ class ROI(nn.Module):
 
         for i in range(roi.size(0)):
             rois = []
-            for k in range(roi.size(1)):
+            for k in range(roi.size(1)):uneven
 
                 x = roi[i, k, 0].long() # long -> torch.int64
                 y = roi[i, k, 1].long()

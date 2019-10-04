@@ -41,6 +41,7 @@ class ROI(nn.Module):
 
                 roi_feature_interpolated = F.interpolate(roi_feature, size=(14, 14),  mode='bilinear', align_corners=True)
 
+                # Here, the max_pool2d is substituted for RCNN_top !
                 roi_pooled = F.max_pool2d(roi_feature_interpolated, kernel_size=2)
 
                 rois.append(roi_pooled)

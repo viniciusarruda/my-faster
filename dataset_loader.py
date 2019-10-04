@@ -5,6 +5,10 @@ from torchvision import transforms
 import torch
 import os
 
+
+# TODO: normalizar os dados de acordo com : https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
+
+
 class MyDataset(Dataset):
 
     def __init__(self, img_dir, csv_file, input_img_size):
@@ -51,7 +55,8 @@ class MyDataset(Dataset):
 
 def get_dataloader():
 
-    input_img_size = (128, 128)
+    # input_img_size = (128, 128)
+    input_img_size = (224, 224)
     dataset = MyDataset(img_dir='dataset/one_day/', csv_file='dataset/one_day.csv', input_img_size=input_img_size)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
     return dataloader, input_img_size

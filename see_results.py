@@ -114,18 +114,18 @@ def show_training_sample(img_np, annotation_np):
     real.show()
 
 
-def show_anchors(anchors_np, valid_anchors_np):
+def show_anchors(anchors_np, valid_anchors_np, image_size):
 
     anchors_np = anchors_np[valid_anchors_np == 1, :]
 
     offset = 128
-    img_np = np.zeros((128 + 2*offset, 128 + 2*offset, 3))
+    img_np = np.zeros((image_size[0] + 2*offset, image_size[1] + 2*offset, 3))
     real = Image.fromarray(img_np.astype(np.uint8))
     real_draw = ImageDraw.Draw(real)
-    real_draw.rectangle([offset - 1, offset - 1, offset + 127 + 1, offset + 127 + 1], outline='yellow') # atencao para o -1 e +1 e seu significado !
+    real_draw.rectangle([offset - 1, offset - 1, offset + image_size[0] - 1 + 1, offset + image_size[1] - 1 + 1], outline='yellow') # atencao para o -1 e +1 e seu significado !
 
     for i in range(anchors_np.shape[0]):
-
+        
         acw = anchors_np[i, 0]
         ach = anchors_np[i, 1]
         aw = anchors_np[i, 2]
@@ -138,26 +138,28 @@ def show_anchors(anchors_np, valid_anchors_np):
 
         real_draw.rectangle([offset + a0, offset + a1, offset + a2, offset + a3], outline='magenta')
     
+    print('A total of {} valid anchors.'.format(anchors_np.shape[0]))
+
     real.show()
     exit()
 
 
-def show_masked_anchors(anchors_np, valid_anchors_np, mask_np, annotation_np):
+def show_masked_anchors(anchors_np, valid_anchors_np, mask_np, annotation_np, image_size):
 
     anchors_np = anchors_np[valid_anchors_np == 1, :]
     mask_np = mask_np[0, :] # batch 1
     
     for mask, mask_name in zip([-1, 0, 1], ['negative', 'middle', 'positive']):
 
-        anchors_np = anchors_np[mask_np == mask, :]
+        masked_anchors_np = anchors_np[mask_np == mask, :]
 
-        for i in range(anchors_np.shape[0]):
+        for i in range(masked_anchors_np.shape[0]):
 
             offset = 128
-            img_np = np.zeros((128 + 2*offset, 128 + 2*offset, 3))
+            img_np = np.zeros((image_size[0] + 2*offset, image_size[1] + 2*offset, 3))
             real = Image.fromarray(img_np.astype(np.uint8))
             real_draw = ImageDraw.Draw(real)
-            real_draw.rectangle([offset - 1, offset - 1, offset + 127 + 1, offset + 127 + 1], outline='yellow') # atencao para o -1 e +1 e seu significado !
+            real_draw.rectangle([offset - 1, offset - 1, offset + image_size[0] - 1 + 1, offset + image_size[1] - 1 + 1], outline='yellow') # atencao para o -1 e +1 e seu significado !
 
             for bi in range(annotation_np.shape[0]):
                 
@@ -168,10 +170,10 @@ def show_masked_anchors(anchors_np, valid_anchors_np, mask_np, annotation_np):
 
                 real_draw.rectangle([offset + x0, offset + y0, offset + x1, offset + y1], outline='green')
 
-            acw = anchors_np[i, 0]
-            ach = anchors_np[i, 1]
-            aw = anchors_np[i, 2]
-            ah = anchors_np[i, 3]
+            acw = masked_anchors_np[i, 0]
+            ach = masked_anchors_np[i, 1]
+            aw = masked_anchors_np[i, 2]
+            ah = masked_anchors_np[i, 3]
 
             a0 = acw - 0.5 * (aw - 1)
             a1 = ach - 0.5 * (ah - 1)

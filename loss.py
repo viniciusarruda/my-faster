@@ -60,6 +60,9 @@ def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_
         mask[bi, torch.argmax(iou)] = 1.0 # se mudar para fazer com bath tem que colocar dim=1 ou outra dependendo do que for
         # else, mask = zero (it is initialized with zeros)
 
+        # mask[bi, torch.argmax(iou)] = 1.0 -> se n fizer isso, pode ter obj que fique sem ancora associada, n sendo possivel sua deteccao
+        # e tbm do jeito que esta implementado, uma parte da loss vai ficar com tensor vazio, dando erro .. 
+
     return mask
 
 # taking in consideration what that man said (about getting computing power is better), is better to find a way to get rid of

@@ -8,11 +8,12 @@ import time
 
 class RPN(nn.Module):
 
-    def  __init__(self, input_img_size, feature_extractor_out_dim, receptive_field_size, device):
+    def  __init__(self, input_img_size, feature_extractor_out_dim, feature_extractor_size, receptive_field_size, device):
     
         super(RPN, self).__init__()
 
         ### Information about the feature extractor ###
+        self.feature_extractor_size = feature_extractor_size
         self.receptive_field_size = receptive_field_size
         self.input_img_size = input_img_size # (n_rows, n_cols)
         ###############################################
@@ -40,7 +41,6 @@ class RPN(nn.Module):
         x = F.relu(self.conv_rpn(x))
         # x -> (batch_size, feature_extractor_out_dim, 64, 64)
 
-
         ### Compute the probability to be an object ###
 
         cls_out = self.cls_layer(x)
@@ -50,7 +50,6 @@ class RPN(nn.Module):
         batch_size, _, _, _ = cls_out.size()
         cls_out = cls_out.permute(0, 2, 3, 1).reshape((batch_size, -1, 2))
         # cls_out -> (batch_size, 64 * 64 * k, 2)
-
         ###############################################
 
         ### Compute the object proposals ###
@@ -202,10 +201,10 @@ class RPN(nn.Module):
         anchors = anchors.reshape(-1)
 
         n_anchors = 4 * len(self.anchor_ratios) * len(self.anchor_scales)
-        all_anchors = np.zeros((n_anchors, 32, 32), dtype=np.float32)
+        all_anchors = np.zeros((n_anchors, self.feature_extractor_size, self.feature_extractor_size), dtype=np.float32)
         for k in range(0, n_anchors, 4):
-            for i in range(0, 32):
-                for j in range(0, 32):
+            for i in range(0, self.feature_extractor_size):
+                for j in range(0, self.feature_extractor_size):
                     all_anchors[k + 0, i, j] = anchors[k + 0] + i * self.receptive_field_size 
                     all_anchors[k + 1, i, j] = anchors[k + 1] + j * self.receptive_field_size
                     all_anchors[k + 2, i, j] = anchors[k + 2]
@@ -227,7 +226,7 @@ class RPN(nn.Module):
             a2 = aw + a0 - 1
             a3 = ah + a1 - 1
 
-            if a0 >= 0 and a1 >= 0 and a2 <= 127 and a3 <= 127:
+            if a0 >= 0 and a1 >= 0 and a2 <= self.input_img_size[1] - 1 and a3 <= self.input_img_size[0] - 1:
                 valid_mask[i] = 1
 
         valid_mask = torch.from_numpy(valid_mask)

@@ -3,6 +3,7 @@ import torch.nn.functional as F
 import numpy as np
 from dataset_loader import get_dataloader
 from feature_extractor import FeatureExtractorNet
+from feature_extractor_complete import FeatureExtractorNetComplete
 from rpn import RPN
 from roi import ROI
 from classifier_regressor import ClassifierRegressor
@@ -57,11 +58,12 @@ def main():
     dataloader, input_img_size = get_dataloader()
 
     fe_net = FeatureExtractorNet().to(device)
-    rpn_net = RPN(input_img_size=input_img_size, feature_extractor_out_dim=fe_net.out_dim, receptive_field_size=fe_net.receptive_field_size, device=device).to(device)
+    # fe_net = FeatureExtractorNetComplete().to(device)
+    rpn_net = RPN(input_img_size=input_img_size, feature_extractor_out_dim=fe_net.out_dim, feature_extractor_size=fe_net.feature_extractor_size, receptive_field_size=fe_net.receptive_field_size, device=device).to(device)
     roi_net = ROI(input_img_size=input_img_size).to(device)
     clss_reg = ClassifierRegressor(input_img_size=input_img_size, input_size=7*7*fe_net.out_dim, n_classes=1).to(device)
 
-    # show_anchors(rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy())
+    # show_anchors(rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), input_img_size)
 
     params = list(fe_net.parameters()) + list(rpn_net.parameters()) + list(roi_net.parameters()) + list(clss_reg.parameters())
     optimizer = torch.optim.Adam(params, lr=0.01)
@@ -102,7 +104,7 @@ def main():
             #####
             ## Compute RPN loss ##
             labels = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation).to(device)
-            # show_masked_anchors(rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), labels.detach().numpy().copy(), annotation.detach().numpy().copy())
+            # show_masked_anchors(rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), labels.detach().numpy().copy(), annotation.detach().numpy().copy(), input_img_size)
             rpn_bbox_loss = get_target_distance(proposals, rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation, labels)
             rpn_prob_loss = compute_rpn_prob_loss(cls_out, labels)
             #####

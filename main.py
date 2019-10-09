@@ -50,6 +50,8 @@ np.random.seed(0)
 
 def main():
 
+    a
+
     lv = LossViz()
     
     device = torch.device("cpu")

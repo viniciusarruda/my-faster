@@ -13,7 +13,6 @@ class FeatureExtractorNet(nn.Module):
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=1, kernel_size=1, padding=0)
         self.linear1 = nn.Linear(1*56*56, 128)
         self.linear2 = nn.Linear(128, self.out_dim*self.feature_extractor_size*self.feature_extractor_size)
-    
 
     def forward(self, x):
 

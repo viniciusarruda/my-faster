@@ -48,9 +48,21 @@ class MyDataset(Dataset):
         image = Image.open(img_name)
         image = transforms.Resize(self.input_img_size)(image)
         image = transforms.ToTensor()(image)
+        image = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(image)
         clss = torch.Tensor(self.files_annot[idx][1])
 
         return image, clss
+
+
+def inv_normalize(t):
+
+    invTrans = transforms.Compose([ transforms.Normalize(mean = [ 0., 0., 0. ],
+                                                     std = [ 1/0.229, 1/0.224, 1/0.225 ]),
+                                transforms.Normalize(mean = [ -0.485, -0.456, -0.406 ],
+                                                     std = [ 1., 1., 1. ]),
+                               ])
+
+    return invTrans(t)
 
 
 def get_dataloader():

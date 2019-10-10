@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import numpy as np
-from dataset_loader import get_dataloader
+from dataset_loader import get_dataloader, inv_normalize
 from feature_extractor import FeatureExtractorNet
 from feature_extractor_complete import FeatureExtractorNetComplete
 from rpn import RPN
@@ -48,9 +48,13 @@ np.random.seed(0)
 # TODO: Implement the training strategy correctly
 # TODO: Use the newest PyTorch version 
 
-def main():
+# TODO: use image with different size (no multiple yet, but different sizes)
+# TODO: more anchor ratios and scales
+# TODO: single image with two (and then more) objects
+# TODO: multiple images
+# TODO: RCNN_top
 
-    a
+def main():
 
     lv = LossViz()
     
@@ -68,7 +72,12 @@ def main():
     # show_anchors(rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), input_img_size)
 
     params = list(fe_net.parameters()) + list(rpn_net.parameters()) + list(roi_net.parameters()) + list(clss_reg.parameters())
-    optimizer = torch.optim.Adam(params, lr=0.01)
+
+    # https://discuss.pytorch.org/t/what-is-the-behavior-of-passing-model-parameters-with-requires-grad-false-to-an-optimizer/57817
+    # still waiting.. is this correct ? I mean, I need to filter ?
+    params = [p for p in params if p.requires_grad == True]
+
+    optimizer = torch.optim.Adam(params, lr=0.001)
 
     for net in [fe_net, rpn_net, roi_net, clss_reg]:
         net.train()
@@ -143,11 +152,12 @@ def main():
         print()
 
         if e % 10 == 0:
+            
             for net in [fe_net, rpn_net, roi_net, clss_reg]: net.eval()
             with torch.no_grad():
 
                 for i in range(proposals.size()[0]):
-                    see_rpn_results(img[i, :, :, :].permute(1, 2, 0).detach().numpy().copy(),
+                    see_rpn_results(inv_normalize(img[i, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),
                                     labels.detach().numpy().copy(), 
                                     proposals.detach().numpy().copy(), 
                                     F.softmax(cls_out, dim=2).detach().numpy().copy(),
@@ -156,14 +166,14 @@ def main():
                                     rpn_net.valid_anchors.detach().numpy().copy(), e)
 
                 for i in range(proposals.size()[0]):
-                    see_rpn_final_results(img[i, :, :, :].permute(1, 2, 0).detach().numpy().copy(),
+                    see_rpn_final_results(inv_normalize(img[i, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),
                                     filtered_proposals.detach().numpy().copy(), 
                                     probs_object.detach().numpy().copy(), 
                                     annotation.detach().numpy().copy(),
                                     e)
 
                 for i in range(refined_proposals.size()[0]):
-                    see_final_results(img[i, :, :, :].permute(1, 2, 0).detach().numpy().copy(),
+                    see_final_results(inv_normalize(img[i, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),
                                     clss_score.detach().numpy().copy(), 
                                     refined_proposals.detach().numpy().copy(), 
                                     annotation.detach().numpy().copy(),

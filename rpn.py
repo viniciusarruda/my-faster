@@ -37,10 +37,10 @@ class RPN(nn.Module):
 
     def forward(self, x):
         # x -> (batch_size, feature_extractor_out_dim, 64, 64)
-
+        
         x = F.relu(self.conv_rpn(x))
         # x -> (batch_size, feature_extractor_out_dim, 64, 64)
-
+    
         ### Compute the probability to be an object ###
 
         cls_out = self.cls_layer(x)
@@ -72,11 +72,11 @@ class RPN(nn.Module):
 
         probs_object = F.softmax(cls_out, dim=2)[:, :, 1] # it is 1 and not zero ! 
         # probs_object -> (batch_size, 64 * 64 * k)
-
+        
         bboxes, probs_object = filter_boxes(bboxes, probs_object)
         # bboxes -> (batch_size, -1, 4)
         # probs_object -> (batch_size, -1)
-
+        
         bboxes, probs_object = nms(bboxes, probs_object)
         # bboxes -> (batch_size, -1, 4)
         # probs_object -> (batch_size, -1)

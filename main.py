@@ -10,6 +10,7 @@ from classifier_regressor import ClassifierRegressor
 from see_results import see_rpn_results, show_training_sample, see_final_results, see_rpn_final_results, show_anchors, show_masked_anchors, LossViz
 from loss import anchor_labels, get_target_distance, compute_rpn_prob_loss, get_target_distance2, get_target_mask, compute_cls_reg_prob_loss
 from PIL import Image
+from tqdm import tqdm
 
 torch.manual_seed(0)
 torch.backends.cudnn.deterministic = True
@@ -57,7 +58,7 @@ np.random.seed(0)
 def main():
 
     lv = LossViz()
-    
+
     device = torch.device("cpu")
     epochs = 1000
 
@@ -69,12 +70,17 @@ def main():
     roi_net = ROI(input_img_size=input_img_size).to(device)
     clss_reg = ClassifierRegressor(input_img_size=input_img_size, input_size=7*7*fe_net.out_dim, n_classes=1).to(device)
 
+    # visual debug
     # show_anchors(rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), input_img_size)
+
+    # for e, (img, annotation) in enumerate(dataloader):
+    #     img, annotation = img.to(device), annotation.to(device)
+    #     labels = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation).to(device)
+    #     show_masked_anchors(e, rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), labels.detach().numpy().copy(), annotation.detach().numpy().copy(), input_img_size)
+    # exit()
 
     params = list(fe_net.parameters()) + list(rpn_net.parameters()) + list(roi_net.parameters()) + list(clss_reg.parameters())
 
-    # https://discuss.pytorch.org/t/what-is-the-behavior-of-passing-model-parameters-with-requires-grad-false-to-an-optimizer/57817
-    # still waiting.. is this correct ? I mean, I need to filter ?
     params = [p for p in params if p.requires_grad == True]
 
     optimizer = torch.optim.Adam(params, lr=0.001)
@@ -84,7 +90,7 @@ def main():
 
     l = len(dataloader)
 
-    for e in range(1, epochs+1):
+    for e in tqdm(range(1, epochs+1)):
 
         rpn_prob_loss_epoch, rpn_bbox_loss_epoch, rpn_loss_epoch = 0, 0, 0
         clss_reg_prob_loss_epoch, clss_reg_bbox_loss_epoch, clss_reg_loss_epoch = 0, 0, 0
@@ -115,7 +121,6 @@ def main():
             #####
             ## Compute RPN loss ##
             labels = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation).to(device)
-            # show_masked_anchors(rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), labels.detach().numpy().copy(), annotation.detach().numpy().copy(), input_img_size)
             rpn_bbox_loss = get_target_distance(proposals, rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation, labels)
             rpn_prob_loss = compute_rpn_prob_loss(cls_out, labels)
             #####

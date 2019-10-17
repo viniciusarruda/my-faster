@@ -28,10 +28,13 @@ class MyDataset(Dataset):
         data = [(d[0], np.array([float(d[i]) for i in range(1, len(d)-1)])) for d in data]
         
         for i in range(len(data)):
-            data[i][1][0] = (data[i][1][0] / original_img_size[0]) * input_img_size[0]
-            data[i][1][1] = (data[i][1][1] / original_img_size[1]) * input_img_size[1]
-            data[i][1][2] = (data[i][1][2] / original_img_size[0]) * input_img_size[0]
-            data[i][1][3] = (data[i][1][3] / original_img_size[1]) * input_img_size[1]
+            # TODO:
+            # the -1 in input img_size is to ensure: [0, input_img_size-1],
+            # but it depends if annotations is considering [0, input_img_size-1] or [1, input_img_size]
+            data[i][1][0] = (data[i][1][0] / original_img_size[0]) * (input_img_size[0] - 1.0)
+            data[i][1][1] = (data[i][1][1] / original_img_size[1]) * (input_img_size[1] - 1.0)
+            data[i][1][2] = (data[i][1][2] / original_img_size[0]) * (input_img_size[0] - 1.0)
+            data[i][1][3] = (data[i][1][3] / original_img_size[1]) * (input_img_size[1] - 1.0)
 
         _inplace_adjust_bbox2offset(data)
 
@@ -69,7 +72,7 @@ def get_dataloader():
 
     # input_img_size = (128, 128)
     input_img_size = (224, 224)
-    dataset = MyDataset(img_dir='dataset/one_day/', csv_file='dataset/one_day.csv', input_img_size=input_img_size)
+    dataset = MyDataset(img_dir='dataset/one_day/', csv_file='dataset/one_three_day.csv', input_img_size=input_img_size)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
     return dataloader, input_img_size
 

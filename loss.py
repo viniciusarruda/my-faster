@@ -25,13 +25,16 @@ def smooth_l1(x, sigma=3):
     return ret
 
 
+# TODO:
+# Selecionar 128 anchoras negativas aleatoriamente
+# selecionar 128 anchoras positivas aleatoriamente
 def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_threshold=0.7): # era 0.3 no negative..
     # tem como simplificar e otimizar..
 
     anchors = anchors[valid_anchors, :]
 
     batch_size = gts.size()[0]
-    mask = torch.zeros(batch_size, anchors.size(0))
+    mask = torch.zeros(batch_size, anchors.size(0)) - 1.0
     
     for bi in range(batch_size):
 
@@ -56,12 +59,9 @@ def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_
         iou = intersection / union
 
         mask[bi, iou > positive_threshold] = 1.0
-        mask[bi, iou < negative_threshold] = -1.0
+        mask[bi, iou < negative_threshold] = 0.0
         mask[bi, torch.argmax(iou)] = 1.0 # se mudar para fazer com bath tem que colocar dim=1 ou outra dependendo do que for
-        # else, mask = zero (it is initialized with zeros)
-
-        # mask[bi, torch.argmax(iou)] = 1.0 -> se n fizer isso, pode ter obj que fique sem ancora associada, n sendo possivel sua deteccao
-        # e tbm do jeito que esta implementado, uma parte da loss vai ficar com tensor vazio, dando erro .. 
+        # else, mask = -1.0 (it is initialized with zeros - 1)    dont care
 
     return mask
 

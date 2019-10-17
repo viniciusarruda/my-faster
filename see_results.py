@@ -144,12 +144,12 @@ def show_anchors(anchors_np, valid_anchors_np, image_size):
     exit()
 
 
-def show_masked_anchors(anchors_np, valid_anchors_np, mask_np, annotation_np, image_size):
+def show_masked_anchors(e, anchors_np, valid_anchors_np, mask_np, annotation_np, image_size):
 
     anchors_np = anchors_np[valid_anchors_np == 1, :]
     mask_np = mask_np[0, :] # batch 1
     
-    for mask, mask_name in zip([-1, 0, 1], ['negative', 'middle', 'positive']):
+    for mask, mask_name in zip([-1.0, 0.0, 1.0], ['middle', 'negative', 'positive']):
 
         masked_anchors_np = anchors_np[mask_np == mask, :]
 
@@ -186,9 +186,9 @@ def show_masked_anchors(anchors_np, valid_anchors_np, mask_np, annotation_np, im
                 # real_draw.rectangle([offset + a0, offset + a1, offset + a2, offset + a3], outline='white')
                 # real_draw.point([offset + anchors_np[i, 0], offset + anchors_np[i, 1]], fill='white')
 
-            real.save('output/anchors/{}/{}.jpg'.format(mask_name, i))
+            real.save('output/anchors/{}/{}_{}.jpg'.format(mask_name, e, i))
 
-    exit()
+    # exit()
 
 
 def _offset2bbox(proposals):

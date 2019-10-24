@@ -55,6 +55,8 @@ np.random.seed(0)
 # TODO: multiple images
 # TODO: RCNN_top
 
+# TODO: invalid anchors can be setted to -1 on labels ? (as dont care..)
+
 def main():
 
     lv = LossViz()
@@ -74,8 +76,9 @@ def main():
     # show_anchors(rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), input_img_size)
 
     # for e, (img, annotation) in enumerate(dataloader):
-    #     img, annotation = img.to(device), annotation.to(device)
-    #     labels = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation).to(device)
+    #     img, annotation = img.to(device), annotation[0, :, :].to(device)
+    #     labels, table_gts_positive_anchors = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation)
+    #     labels, table_gts_positive_anchors = labels.to(device), table_gts_positive_anchors.to(device)
     #     show_masked_anchors(e, rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), labels.detach().numpy().copy(), annotation.detach().numpy().copy(), input_img_size)
     # exit()
 
@@ -97,7 +100,8 @@ def main():
         
         for img, annotation in dataloader:
 
-            img, annotation = img.to(device), annotation.to(device)
+            # it is just one image, however, for the image should keep the batch channel
+            img, annotation = img.to(device), annotation[0, :, :].to(device)
 
             optimizer.zero_grad()
 
@@ -115,20 +119,21 @@ def main():
             # print('Roi size: {}'.format(rois.size()))
             #
             raw_reg, raw_cls = clss_reg.forward(rois)
-            # print('Refined proposals size: {}'.format(refined_proposals.size()))
-            # print('Clss size: {}'.format(clss_score.size()))
-
+            # print('raw_reg size: {}'.format(raw_reg.size()))
+            # print('raw_cls size: {}'.format(raw_cls.size()))
+            
             #####
             ## Compute RPN loss ##
-            labels = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation).to(device)
-            rpn_bbox_loss = get_target_distance(proposals, rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation, labels)
+            labels, table_gts_positive_anchors = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation)
+            labels, table_gts_positive_anchors = labels.to(device), table_gts_positive_anchors.to(device)
+            rpn_bbox_loss = get_target_distance(proposals, rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation, table_gts_positive_anchors)
             rpn_prob_loss = compute_rpn_prob_loss(cls_out, labels)
             #####
 
             #####
             ## Compute class_reg loss ##
-            fg_mask, cls_mask = get_target_mask(filtered_proposals, annotation)
-            clss_reg_bbox_loss = get_target_distance2(raw_reg, filtered_proposals, annotation, fg_mask)
+            table_fgs_positive_proposals, cls_mask = get_target_mask(filtered_proposals, annotation)
+            clss_reg_bbox_loss = get_target_distance2(raw_reg, filtered_proposals, annotation, table_fgs_positive_proposals)
             clss_reg_prob_loss = compute_cls_reg_prob_loss(raw_cls, cls_mask)
             refined_proposals, clss_score = clss_reg.infer_bboxes(filtered_proposals, raw_reg, raw_cls)
             #####
@@ -152,7 +157,7 @@ def main():
             optimizer.step()
 
         lv.record(e, rpn_prob_loss_epoch / l, rpn_bbox_loss_epoch / l, rpn_loss_epoch / l, clss_reg_prob_loss_epoch / l, clss_reg_bbox_loss_epoch / l, clss_reg_loss_epoch / l)
-        print('Epoch {}: rpn_prob_loss: {} + rpn_bbox_loss: {} = {}'.format(e, rpn_prob_loss_epoch / l, rpn_bbox_loss_epoch / l, rpn_loss_epoch / l))
+        print('\nEpoch {}: rpn_prob_loss: {} + rpn_bbox_loss: {} = {}'.format(e, rpn_prob_loss_epoch / l, rpn_bbox_loss_epoch / l, rpn_loss_epoch / l))
         print('       : clss_reg_prob_loss: {} + clss_reg_bbox_loss: {} = {}'.format(clss_reg_prob_loss_epoch / l, clss_reg_bbox_loss_epoch / l, clss_reg_loss_epoch / l))
         print()
 
@@ -163,7 +168,7 @@ def main():
 
                 for i in range(proposals.size()[0]):
                     see_rpn_results(inv_normalize(img[i, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),
-                                    labels.detach().numpy().copy(), 
+                                    table_gts_positive_anchors.detach().numpy().copy(), 
                                     proposals.detach().numpy().copy(), 
                                     F.softmax(cls_out, dim=2).detach().numpy().copy(),
                                     annotation.detach().numpy().copy(),

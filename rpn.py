@@ -20,8 +20,8 @@ class RPN(nn.Module):
 
         ### Anchor related attributes ###
         # acredito que ao implementar a resnet como feature extractor pode melhorar colocando mais ratios e scales, ficou ruim do jeito que esta
-        self.anchor_ratios = [1] #[0.5, 1, 2] 
-        self.anchor_scales = [4] #[8, 16, 32]
+        self.anchor_ratios = [0.8, 1, 1.2]  #[1] #[0.5, 1, 2] 
+        self.anchor_scales = [3.5, 4, 4.5] #[4] #[8, 16, 32]
         self.k = len(self.anchor_scales) * len(self.anchor_ratios)
         self.anchors_parameters, self.valid_anchors = self._get_anchors_parameters()
         self.anchors_parameters, self.valid_anchors = self.anchors_parameters.to(device), self.valid_anchors.to(device)

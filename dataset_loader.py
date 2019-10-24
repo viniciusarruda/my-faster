@@ -4,6 +4,7 @@ import numpy as np
 from torchvision import transforms
 import torch
 import os
+from pprint import pprint
 
 
 # TODO: normalizar os dados de acordo com : https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
@@ -26,7 +27,7 @@ class MyDataset(Dataset):
             lines = f.readlines()
         data = [l.strip().split(',') for l in lines]
         data = [(d[0], np.array([float(d[i]) for i in range(1, len(d)-1)])) for d in data]
-        
+
         for i in range(len(data)):
             # TODO:
             # the -1 in input img_size is to ensure: [0, input_img_size-1],
@@ -37,6 +38,7 @@ class MyDataset(Dataset):
             data[i][1][3] = (data[i][1][3] / original_img_size[1]) * (input_img_size[1] - 1.0)
 
         _inplace_adjust_bbox2offset(data)
+        data = _group_by_filename(data)
 
         self.files_annot = data
         self.img_dir = img_dir
@@ -46,13 +48,14 @@ class MyDataset(Dataset):
         return len(self.files_annot)
 
     def __getitem__(self, idx):
-        img_name = os.path.join(self.img_dir,
-                                self.files_annot[idx][0])
+
+        img_base_name, bboxes = self.files_annot[idx]
+        img_name = os.path.join(self.img_dir, img_base_name)
         image = Image.open(img_name)
         image = transforms.Resize(self.input_img_size)(image)
         image = transforms.ToTensor()(image)
         image = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(image)
-        clss = torch.Tensor(self.files_annot[idx][1])
+        clss = torch.Tensor(bboxes)
 
         return image, clss
 
@@ -88,3 +91,27 @@ def _inplace_adjust_bbox2offset(bbox_data_list):
 
         bbox[2] = bbox[2] - bbox[0] + 1
         bbox[3] = bbox[3] - bbox[1] + 1    
+
+
+def _group_by_filename(data_list):
+
+    data_dict = {}
+
+    for filename, bbox in data_list:
+
+        try:
+            data_dict[filename].append(bbox)
+        except:
+            data_dict[filename] = []
+            data_dict[filename].append(bbox)
+
+    return [(filename, np.stack(bboxes)) for filename, bboxes in data_dict.items()]
+
+
+if __name__ == "__main__":
+
+    dataloader, input_img_size = get_dataloader()
+
+    for img, annotation in dataloader:
+
+        print(img.size(), annotation.size())

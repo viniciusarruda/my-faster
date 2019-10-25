@@ -190,7 +190,47 @@ def show_anchors(anchors_np, valid_anchors_np, image_size):
     exit()
 
 
-def show_masked_anchors(e, anchors_np, valid_anchors_np, mask_np, annotation_np, image_size):
+def show_associated_positive_anchors(img_number, anchors_np, valid_anchors_np, table_gts_positive_anchors_np, annotation_np, image_size):
+
+    vanchors_np = anchors_np[valid_anchors_np == 1, :]
+
+    for gti in range(annotation_np.shape[0]):
+
+        offset = 128
+        img_np = np.zeros((image_size[0] + 2*offset, image_size[1] + 2*offset, 3))
+        real = Image.fromarray(img_np.astype(np.uint8))
+        real_draw = ImageDraw.Draw(real)
+        real_draw.rectangle([offset - 1, offset - 1, offset + image_size[0] - 1 + 1, offset + image_size[1] - 1 + 1], outline='yellow') # atencao para o -1 e +1 e seu significado !
+
+        x0 = annotation_np[gti, 0]
+        y0 = annotation_np[gti, 1]
+        x1 = annotation_np[gti, 0] + annotation_np[gti, 2] - 1
+        y1 = annotation_np[gti, 1] + annotation_np[gti, 3] - 1
+
+        real_draw.rectangle([offset + x0, offset + y0, offset + x1, offset + y1], outline='green')
+
+        for pai in np.argwhere(table_gts_positive_anchors_np[:, 0] == gti): 
+
+            positive_anchor_idx = table_gts_positive_anchors_np[pai[0], 1]
+
+            acw = vanchors_np[positive_anchor_idx, 0]
+            ach = vanchors_np[positive_anchor_idx, 1]
+            aw = vanchors_np[positive_anchor_idx, 2]
+            ah = vanchors_np[positive_anchor_idx, 3]
+
+            a0 = acw - 0.5 * (aw - 1)
+            a1 = ach - 0.5 * (ah - 1)
+            a2 = aw + a0 - 1
+            a3 = ah + a1 - 1
+
+            real_draw.rectangle([offset + a0, offset + a1, offset + a2, offset + a3], outline='magenta')
+
+        real.save('output/anchors/associated_positive_anchors/{}_{}.jpg'.format(img_number, gti))
+
+
+def show_masked_anchors(e, anchors_np, valid_anchors_np, mask_np, table_gts_positive_anchors_np, annotation_np, image_size):
+
+    show_associated_positive_anchors(e, anchors_np, valid_anchors_np, table_gts_positive_anchors_np, annotation_np, image_size)
 
     anchors_np = anchors_np[valid_anchors_np == 1, :]
     # mask_np = mask_np[0, :] # batch 1

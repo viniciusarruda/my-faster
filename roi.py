@@ -24,7 +24,10 @@ class ROI(nn.Module):
         w = proposals[:, :, 2] * fx
         h = proposals[:, :, 3] * fy
 
-        roi = torch.stack((x, y, w, h), dim=2)
+        # fazer um estudo do tradeoff de deixar o floor e ceil ou n
+        # I put floor and ceil to get the whole feature information, otherwise will truncate the feature size covered by the proposal
+        roi = torch.stack((x, y, w, h), dim=2).long() # long -> torch.int64
+        # roi = torch.stack((x.floor(), y.floor(), w.ceil(), h.ceil()), dim=2).long() # long -> torch.int64
 
         batch_rois = []
 
@@ -32,10 +35,10 @@ class ROI(nn.Module):
             rois = []
             for k in range(roi.size(1)):
 
-                x = roi[i, k, 0].long() # long -> torch.int64
-                y = roi[i, k, 1].long()
-                w = roi[i, k, 2].long()
-                h = roi[i, k, 3].long()
+                x = roi[i, k, 0]
+                y = roi[i, k, 1]
+                w = roi[i, k, 2]
+                h = roi[i, k, 3]
 
                 roi_feature = features[i, :, x:x+w, y:y+h].unsqueeze(0)
 

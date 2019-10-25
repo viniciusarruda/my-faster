@@ -75,7 +75,7 @@ def get_dataloader():
 
     # input_img_size = (128, 128)
     input_img_size = (224, 224)
-    dataset = MyDataset(img_dir='dataset/one_day/', csv_file='dataset/one_three_day.csv', input_img_size=input_img_size)
+    dataset = MyDataset(img_dir='dataset/one_day/', csv_file='dataset/one_day.csv', input_img_size=input_img_size)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
     return dataloader, input_img_size
 

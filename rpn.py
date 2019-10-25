@@ -69,14 +69,15 @@ class RPN(nn.Module):
 
         bboxes = offset2bbox(proposals)
         bboxes = clip_boxes(bboxes, self.input_img_size)
-
+        
         probs_object = F.softmax(cls_out, dim=2)[:, :, 1] # it is 1 and not zero ! 
         # probs_object -> (batch_size, 64 * 64 * k)
         
-        bboxes, probs_object = filter_boxes(bboxes, probs_object)
+        # parece que o codigo original n filtra no treino.. so no teste..
+        bboxes, probs_object = filter_boxes(bboxes, probs_object) # should filter before softmax to consume less computational
         # bboxes -> (batch_size, -1, 4)
         # probs_object -> (batch_size, -1)
-        
+
         bboxes, probs_object = nms(bboxes, probs_object)
         # bboxes -> (batch_size, -1, 4)
         # probs_object -> (batch_size, -1)

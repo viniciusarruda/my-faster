@@ -70,7 +70,7 @@ class ClassifierRegressor(nn.Module):
         bboxes = offset2bbox(refined_proposals)
         bboxes = clip_boxes(bboxes, self.input_img_size)
 
-        bboxes, clss_score = filter_boxes(bboxes, clss_score) # ??????? no rpn tem isso, fazer aqui tbm ?
+        bboxes, clss_score = filter_boxes(bboxes, clss_score) # ??????? no rpn tem isso, fazer aqui tbm ? na verdade achei no codigo oficial que faz isso no teste sim mas no treino n.. confirmar este ultimo (treino n)
 
         # apply NMS
         bboxes, clss_score = nms(bboxes, clss_score)

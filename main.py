@@ -56,6 +56,13 @@ np.random.seed(0)
 # TODO: RCNN_top
 
 # TODO: invalid anchors can be setted to -1 on labels ? (as dont care..)
+# TODO: When processing the ground truths, show warnings when a certain GT box have no associated positive anchor
+
+TODO NOW: what is the behavior when is there a not assigned gt ?
+checar este behavior..
+eliminar esse gt caso for isso mesmo que eu estiver pensando, pois n vai servir de nada
+
+partir para o treino com batch balanceado!
 
 def main():
 
@@ -79,7 +86,7 @@ def main():
     #     img, annotation = img.to(device), annotation[0, :, :].to(device)
     #     labels, table_gts_positive_anchors = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation)
     #     labels, table_gts_positive_anchors = labels.to(device), table_gts_positive_anchors.to(device)
-    #     show_masked_anchors(e, rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), labels.detach().numpy().copy(), annotation.detach().numpy().copy(), input_img_size)
+    #     show_masked_anchors(e, rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), labels.detach().numpy().copy(), table_gts_positive_anchors.detach().numpy().copy(), annotation.detach().numpy().copy(), input_img_size)
     # exit()
 
     params = list(fe_net.parameters()) + list(rpn_net.parameters()) + list(roi_net.parameters()) + list(clss_reg.parameters())
@@ -115,27 +122,13 @@ def main():
             # print('Proposals size: {}'.format(proposals.size()))
             # print('Probabilities object size: {}'.format(probs_object.size()))
 
-            rois = roi_net.forward(filtered_proposals, features)
-            # print('Roi size: {}'.format(rois.size()))
-            #
-            raw_reg, raw_cls = clss_reg.forward(rois)
-            # print('raw_reg size: {}'.format(raw_reg.size()))
-            # print('raw_cls size: {}'.format(raw_cls.size()))
-            
-            #####
+
+            #####     interfere calcular a loss aqui antes de fazer o proximo passo ?
             ## Compute RPN loss ##
             labels, table_gts_positive_anchors = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation)
             labels, table_gts_positive_anchors = labels.to(device), table_gts_positive_anchors.to(device)
             rpn_bbox_loss = get_target_distance(proposals, rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation, table_gts_positive_anchors)
             rpn_prob_loss = compute_rpn_prob_loss(cls_out, labels)
-            #####
-
-            #####
-            ## Compute class_reg loss ##
-            table_fgs_positive_proposals, cls_mask = get_target_mask(filtered_proposals, annotation)
-            clss_reg_bbox_loss = get_target_distance2(raw_reg, filtered_proposals, annotation, table_fgs_positive_proposals)
-            clss_reg_prob_loss = compute_cls_reg_prob_loss(raw_cls, cls_mask)
-            refined_proposals, clss_score = clss_reg.infer_bboxes(filtered_proposals, raw_reg, raw_cls)
             #####
 
             rpn_loss = 10 * rpn_prob_loss + rpn_bbox_loss
@@ -144,13 +137,41 @@ def main():
             rpn_bbox_loss_epoch += rpn_bbox_loss.item()
             rpn_loss_epoch += rpn_loss.item()
 
-            clss_reg_loss = clss_reg_prob_loss + clss_reg_bbox_loss
 
-            clss_reg_prob_loss_epoch += clss_reg_prob_loss.item()
-            clss_reg_bbox_loss_epoch += clss_reg_bbox_loss.item()
-            clss_reg_loss_epoch += clss_reg_loss.item()
+            # assert filtered_proposals.size(1) > 0
+            if filtered_proposals.size(1) > 0:
 
-            total_loss = rpn_loss + clss_reg_loss
+                rois = roi_net.forward(filtered_proposals, features)
+                # print('Roi size: {}'.format(rois.size()))
+                #
+                raw_reg, raw_cls = clss_reg.forward(rois)
+                # print('raw_reg size: {}'.format(raw_reg.size()))
+                # print('raw_cls size: {}'.format(raw_cls.size()))
+
+                #####
+                ## Compute class_reg loss ##
+                table_fgs_positive_proposals, cls_mask = get_target_mask(filtered_proposals, annotation)
+                clss_reg_bbox_loss = get_target_distance2(raw_reg, filtered_proposals, annotation, table_fgs_positive_proposals)
+                if (cls_mask != -1.0).sum() > 0:
+                    clss_reg_prob_loss = compute_cls_reg_prob_loss(raw_cls, cls_mask)
+                    clss_reg_loss = clss_reg_prob_loss + clss_reg_bbox_loss
+                    clss_reg_prob_loss_epoch += clss_reg_prob_loss.item()
+                else:
+                    clss_reg_loss = clss_reg_bbox_loss
+                #####
+
+                clss_reg_bbox_loss_epoch += clss_reg_bbox_loss.item()
+                clss_reg_loss_epoch += clss_reg_loss.item()
+
+                total_loss = rpn_loss + clss_reg_loss
+                show_all_results = True
+
+                refined_proposals, clss_score = clss_reg.infer_bboxes(filtered_proposals, raw_reg, raw_cls)
+            
+            else:
+
+                total_loss = rpn_loss
+                show_all_results = False
 
             total_loss.backward()
 
@@ -174,20 +195,20 @@ def main():
                                     annotation.detach().numpy().copy(),
                                     rpn_net.anchors_parameters.detach().numpy().copy(),
                                     rpn_net.valid_anchors.detach().numpy().copy(), e)
+                if show_all_results:
+                    for i in range(proposals.size()[0]):
+                        see_rpn_final_results(inv_normalize(img[i, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),
+                                        filtered_proposals.detach().numpy().copy(), 
+                                        probs_object.detach().numpy().copy(), 
+                                        annotation.detach().numpy().copy(),
+                                        e)
 
-                for i in range(proposals.size()[0]):
-                    see_rpn_final_results(inv_normalize(img[i, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),
-                                    filtered_proposals.detach().numpy().copy(), 
-                                    probs_object.detach().numpy().copy(), 
-                                    annotation.detach().numpy().copy(),
-                                    e)
-
-                for i in range(refined_proposals.size()[0]):
-                    see_final_results(inv_normalize(img[i, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),
-                                    clss_score.detach().numpy().copy(), 
-                                    refined_proposals.detach().numpy().copy(), 
-                                    annotation.detach().numpy().copy(),
-                                    e)
+                    for i in range(refined_proposals.size()[0]):
+                        see_final_results(inv_normalize(img[i, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),
+                                        clss_score.detach().numpy().copy(), 
+                                        refined_proposals.detach().numpy().copy(), 
+                                        annotation.detach().numpy().copy(),
+                                        e)
             for net in [fe_net, rpn_net, roi_net, clss_reg]: net.train()
     
     lv.save()

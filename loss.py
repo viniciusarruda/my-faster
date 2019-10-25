@@ -407,14 +407,13 @@ def compute_cls_reg_prob_loss(probs_object, labels):
     # this has effect to consider the class 0 -> background
     #                             the class 1 -> car
 
-    if labels[idxs].long().size(0) == 0:
-        # TODO
-        print('CLASS MASK WITHOUT ANY VALUE, IT WILL CONTINUE BUT SHOULD SEE THIS')
-        return torch.zeros(1)
+    # if labels[idxs].long().size(0) == 0:
+    #     # TODO
+    #     print('CLASS MASK WITHOUT ANY VALUE, IT WILL CONTINUE BUT SHOULD SEE THIS')
+    #     return torch.zeros(1)
 
     prob_loss = F.cross_entropy(probs_object[idxs, :], labels[idxs].long(), reduction='sum') 
     return prob_loss # / d
 
     
 # NAO DESISTE !!!!!!!!!!!!!!!!!
-

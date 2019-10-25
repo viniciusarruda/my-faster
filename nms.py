@@ -14,21 +14,15 @@ def nms(bboxes, probs_object):
 
 def _nms(bboxes, probs_object):
     # ter certeza da minha implementacao nms.. testar com um if main em baixo com algum caso toy !
-    # print(bboxes.size())
-    # print(probs_object.size())
 
     idxs = torch.argsort(probs_object, descending=True)
 
     # colocando com 100 ou 600 piorou ! acredito que ao implementar a resnet como feature extractor pode melhorar aqui
     n_bboxes = 30 #100 #600
     idxs = idxs[:n_bboxes]
-    # print(idxs.size())
 
     bboxes = bboxes[idxs, :]
     probs_object = probs_object[idxs]
-
-    # print(bboxes.size())
-    # print(probs_object.size())
 
     k = 0
     while k < bboxes.size(0) - 1:
@@ -37,6 +31,7 @@ def _nms(bboxes, probs_object):
         x0_0, y0_0, x1_0, y1_0 = bboxes[k, 0], bboxes[k, 1], bboxes[k, 2], bboxes[k, 3]
         area_0 = (x1_0 - x0_0 + 1) * (y1_0 - y0_0 + 1)
         assert x1_0 > x0_0 and y1_0 > y0_0 # just to ensure.. but this is dealt before I think... I am shure !!
+        # actually can be assert x1_0 >= x0_0 and y1_0 >= y0_0
 
         # print(k+1, bboxes.size(0)-1)
 

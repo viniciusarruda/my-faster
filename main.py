@@ -49,6 +49,8 @@ np.random.seed(0)
 # TODO: Implement the training strategy correctly
 # TODO: Use the newest PyTorch version 
 
+# TODO: during training, use only the valid anchors, but in test, all anchors..
+
 # TODO: use image with different size (no multiple yet, but different sizes)
 # TODO: more anchor ratios and scales
 # TODO: single image with two (and then more) objects
@@ -58,11 +60,11 @@ np.random.seed(0)
 # TODO: invalid anchors can be setted to -1 on labels ? (as dont care..)
 # TODO: When processing the ground truths, show warnings when a certain GT box have no associated positive anchor
 
-TODO NOW: what is the behavior when is there a not assigned gt ?
-checar este behavior..
-eliminar esse gt caso for isso mesmo que eu estiver pensando, pois n vai servir de nada
+# TODO NOW: what is the behavior when is there a not assigned gt ?
+# checar este behavior..
+# eliminar esse gt caso for isso mesmo que eu estiver pensando, pois n vai servir de nada
 
-partir para o treino com batch balanceado!
+# partir para o treino com batch balanceado!
 
 def main():
 
@@ -71,13 +73,15 @@ def main():
     device = torch.device("cpu")
     epochs = 1000
 
-    dataloader, input_img_size = get_dataloader()
+    input_img_size = (224, 224)
 
     fe_net = FeatureExtractorNet().to(device)
     # fe_net = FeatureExtractorNetComplete().to(device)
     rpn_net = RPN(input_img_size=input_img_size, feature_extractor_out_dim=fe_net.out_dim, feature_extractor_size=fe_net.feature_extractor_size, receptive_field_size=fe_net.receptive_field_size, device=device).to(device)
     roi_net = ROI(input_img_size=input_img_size).to(device)
     clss_reg = ClassifierRegressor(input_img_size=input_img_size, input_size=7*7*fe_net.out_dim, n_classes=1).to(device)
+
+    dataloader, input_img_size = get_dataloader(rpn_net.anchors_parameters, rpn_net.valid_anchors)
 
     # visual debug
     # show_anchors(rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), input_img_size)
@@ -105,10 +109,11 @@ def main():
         rpn_prob_loss_epoch, rpn_bbox_loss_epoch, rpn_loss_epoch = 0, 0, 0
         clss_reg_prob_loss_epoch, clss_reg_bbox_loss_epoch, clss_reg_loss_epoch = 0, 0, 0
         
-        for img, annotation in dataloader:
+        for img, annotation, labels, table_gts_positive_anchors in dataloader:
 
             # it is just one image, however, for the image should keep the batch channel
             img, annotation = img.to(device), annotation[0, :, :].to(device)
+            labels, table_gts_positive_anchors = labels[0, :].to(device), table_gts_positive_anchors[0, :, :].to(device)
 
             optimizer.zero_grad()
 
@@ -123,10 +128,9 @@ def main():
             # print('Probabilities object size: {}'.format(probs_object.size()))
 
 
-            #####     interfere calcular a loss aqui antes de fazer o proximo passo ?
             ## Compute RPN loss ##
-            labels, table_gts_positive_anchors = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation)
-            labels, table_gts_positive_anchors = labels.to(device), table_gts_positive_anchors.to(device)
+            # labels, table_gts_positive_anchors = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation)
+            # labels, table_gts_positive_anchors = labels.to(device), table_gts_positive_anchors.to(device)
             rpn_bbox_loss = get_target_distance(proposals, rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation, table_gts_positive_anchors)
             rpn_prob_loss = compute_rpn_prob_loss(cls_out, labels)
             #####

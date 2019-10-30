@@ -1,6 +1,5 @@
 import torch
 import torch.nn.functional as F
-from dataset_loader import get_dataloader
 from rpn import RPN
 from bbox_utils import offset2bbox
 import numpy as np

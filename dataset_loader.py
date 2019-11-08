@@ -47,6 +47,8 @@ class MyDataset(Dataset):
         self.files_annot = data
         self.img_dir = img_dir
         self.input_img_size = input_img_size
+        self.batch_size = 256
+        self.half_batch_size = int(0.5 * self.batch_size)
 
     def __len__(self):
         return len(self.files_annot)
@@ -62,21 +64,40 @@ class MyDataset(Dataset):
 
         # here, randomly get the batch
         # print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
-        TODO: fazer a implementação correta, testar
-        NEXT TODO: fazer o mesmo porem com a segunda parte da rede (25% 75%)
+        # TODO: fazer a implementação correta, testar
+        # NEXT TODO: fazer o mesmo porem com a segunda parte da rede (25% 75%)
 
+        ### Select up to self.half_batch_size positive anchors
+        ### The excess is marked as dont care
+        # TODO
+        if (labels == 1).sum() > self.half_batch_size:
+            raise NotImplementedError('Warning, did not implemented!')
+
+        # should keep the table_gts_positive_anchors consistent with the positive labels
+        # print(table_gts_positive_anchors)
+
+        ### Select self.batch_size - positive anchors size negative anchors
+        ### I think the excess is marked as dont care too (did not confirmed)
         negative = (labels == 0).nonzero()[:, 0]
-        idxs = torch.randperm(negative.size(0))[:negative.size(0) - (labels == 1).sum()]
+        n_positive_anchors = (labels == 1).sum()
+        n_anchors_to_complete_batch = self.batch_size - n_positive_anchors
+
+        if n_anchors_to_complete_batch > negative.size(0):
+            raise NotImplementedError('Warning, did not implemented! How to proceed with this?')
+            # There is less anchors than the batch size.. just use the available ones ?
+
+        idxs = torch.randperm(negative.size(0))[:negative.size(0) - n_anchors_to_complete_batch]
         negative_idxs = negative[idxs]
 
         new_labels = labels.detach().clone() # it is really needed to detach and clone ? (can much effort for the same effect)
-        new_labels[negative_idxs] = -1
+        new_labels[negative_idxs] = -1 # mark them as dont care
 
+        # print('-----')
         # print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
         # print((new_labels == -1).sum(), (new_labels == 0).sum(), (new_labels == 1).sum())
+        # print('---------')
 
         # exit()
-
 
         return image, bboxes, new_labels, table_gts_positive_anchors
 

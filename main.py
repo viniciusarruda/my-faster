@@ -155,6 +155,8 @@ def main():
                 #####
                 ## Compute class_reg loss ##
                 table_fgs_positive_proposals, cls_mask = get_target_mask(filtered_proposals, annotation)
+                #TODO here, filter the number of positive and background
+                todo here !
                 clss_reg_bbox_loss = get_target_distance2(raw_reg, filtered_proposals, annotation, table_fgs_positive_proposals)
                 if (cls_mask != -1.0).sum() > 0:
                     clss_reg_prob_loss = compute_cls_reg_prob_loss(raw_cls, cls_mask)
@@ -184,6 +186,7 @@ def main():
         lv.record(e, rpn_prob_loss_epoch / l, rpn_bbox_loss_epoch / l, rpn_loss_epoch / l, clss_reg_prob_loss_epoch / l, clss_reg_bbox_loss_epoch / l, clss_reg_loss_epoch / l)
         print('\nEpoch {}: rpn_prob_loss: {} + rpn_bbox_loss: {} = {}'.format(e, rpn_prob_loss_epoch / l, rpn_bbox_loss_epoch / l, rpn_loss_epoch / l))
         print('       : clss_reg_prob_loss: {} + clss_reg_bbox_loss: {} = {}'.format(clss_reg_prob_loss_epoch / l, clss_reg_bbox_loss_epoch / l, clss_reg_loss_epoch / l))
+        print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
         print()
 
         if e % 10 == 0:

@@ -1,4 +1,5 @@
 import torch
+import config
 
 def nms(bboxes, probs_object):
 
@@ -15,10 +16,12 @@ def nms(bboxes, probs_object):
 def _nms(bboxes, probs_object):
     # ter certeza da minha implementacao nms.. testar com um if main em baixo com algum caso toy !
 
+    # Alguns lugares dizem que a pre-seleção dos top proposals é depois do nms, 
+    # mas para mim, faz mais sentido em ser antes, além de ter um menor custo computacional.
     idxs = torch.argsort(probs_object, descending=True)
-
+    
     # colocando com 100 ou 600 piorou ! acredito que ao implementar a resnet como feature extractor pode melhorar aqui
-    n_bboxes = 30 #100 #600
+    n_bboxes = config.pre_nms_top_n #100 #600
     idxs = idxs[:n_bboxes]
 
     bboxes = bboxes[idxs, :]

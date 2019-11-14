@@ -1,17 +1,23 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+import config
 
 class FeatureExtractorNet(nn.Module):
     def  __init__(self):
         super(FeatureExtractorNet, self).__init__()
 
+        h, w = config.input_img_size
+        self.max_h = h // 4
+        self.max_w = w // 4
+        assert h == w
+
         self.out_dim = 12
         self.receptive_field_size = 16 #4 # 2 ^ number_of_maxpool_stride_2
-        self.feature_extractor_size = 14 #32
+        self.feature_extractor_size = h // self.receptive_field_size #14 #32
 
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=1, kernel_size=1, padding=0)
-        self.linear1 = nn.Linear(1*56*56, 128)
+        self.linear1 = nn.Linear(1*self.max_h*self.max_w, 128)
         self.linear2 = nn.Linear(128, self.out_dim*self.feature_extractor_size*self.feature_extractor_size)
 
     def forward(self, x):
@@ -21,7 +27,7 @@ class FeatureExtractorNet(nn.Module):
         # print(x.size())
         x = F.max_pool2d(x, 4)
         # print(x.size())
-        x = x.view(-1, 1*56*56)
+        x = x.view(-1, 1*self.max_h*self.max_w)
         # print(x.size())
         x = self.linear1(x)
         x = torch.sigmoid(x)

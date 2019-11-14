@@ -279,6 +279,19 @@ def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0
     # do not needed to reverse like the anchor_label()
     cls_mask, _ = torch.max(cls_mask, dim=0)
 
+    #TODO here, filter the number of positive and background
+    # todo here !
+
+    # print(table_fgs_positive_proposals)
+    # print((cls_mask == -1).sum(), (cls_mask == 0).sum(), (cls_mask == 1).sum())
+    # exit()
+
+    if (cls_mask == 1).sum() > 16:
+        raise NotImplementedError('Warning, did not implemented!')
+
+    if (cls_mask == 0).sum() > 48:
+        raise NotImplementedError('Warning, did not implemented!')
+
     return table_fgs_positive_proposals, cls_mask
 
         # # mask[bi, iou > high_threshold] = 1.0

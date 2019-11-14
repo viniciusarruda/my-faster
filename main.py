@@ -11,6 +11,7 @@ from see_results import see_rpn_results, show_training_sample, see_final_results
 from loss import anchor_labels, get_target_distance, compute_rpn_prob_loss, get_target_distance2, get_target_mask, compute_cls_reg_prob_loss
 from PIL import Image
 from tqdm import tqdm
+import config
 
 torch.manual_seed(0)
 torch.backends.cudnn.deterministic = True
@@ -71,26 +72,23 @@ def main():
     lv = LossViz()
 
     device = torch.device("cpu")
-    epochs = 1000
-
-    input_img_size = (224, 224)
 
     fe_net = FeatureExtractorNet().to(device)
     # fe_net = FeatureExtractorNetComplete().to(device)
-    rpn_net = RPN(input_img_size=input_img_size, feature_extractor_out_dim=fe_net.out_dim, feature_extractor_size=fe_net.feature_extractor_size, receptive_field_size=fe_net.receptive_field_size, device=device).to(device)
-    roi_net = ROI(input_img_size=input_img_size).to(device)
-    clss_reg = ClassifierRegressor(input_img_size=input_img_size, input_size=7*7*fe_net.out_dim, n_classes=1).to(device)
+    rpn_net = RPN(input_img_size=config.input_img_size, feature_extractor_out_dim=fe_net.out_dim, feature_extractor_size=fe_net.feature_extractor_size, receptive_field_size=fe_net.receptive_field_size, device=device).to(device)
+    roi_net = ROI(input_img_size=config.input_img_size).to(device)
+    clss_reg = ClassifierRegressor(input_img_size=config.input_img_size, input_size=7*7*fe_net.out_dim, n_classes=1).to(device)
 
-    dataloader, input_img_size = get_dataloader(rpn_net.anchors_parameters, rpn_net.valid_anchors)
+    dataloader = get_dataloader(rpn_net.anchors_parameters, rpn_net.valid_anchors)
 
     # visual debug
-    # show_anchors(rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), input_img_size)
+    # show_anchors(rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), config.input_img_size)
 
-    # for e, (img, annotation) in enumerate(dataloader):
+    # for e, (img, annotation, _, _) in enumerate(dataloader):
     #     img, annotation = img.to(device), annotation[0, :, :].to(device)
     #     labels, table_gts_positive_anchors = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation)
     #     labels, table_gts_positive_anchors = labels.to(device), table_gts_positive_anchors.to(device)
-    #     show_masked_anchors(e, rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), labels.detach().numpy().copy(), table_gts_positive_anchors.detach().numpy().copy(), annotation.detach().numpy().copy(), input_img_size)
+    #     show_masked_anchors(e, rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), labels.detach().numpy().copy(), table_gts_positive_anchors.detach().numpy().copy(), annotation.detach().numpy().copy(), config.input_img_size)
     # exit()
 
     params = list(fe_net.parameters()) + list(rpn_net.parameters()) + list(roi_net.parameters()) + list(clss_reg.parameters())
@@ -104,7 +102,7 @@ def main():
 
     l = len(dataloader)
 
-    for e in tqdm(range(1, epochs+1)):
+    for e in tqdm(range(1, config.epochs+1)):
 
         rpn_prob_loss_epoch, rpn_bbox_loss_epoch, rpn_loss_epoch = 0, 0, 0
         clss_reg_prob_loss_epoch, clss_reg_bbox_loss_epoch, clss_reg_loss_epoch = 0, 0, 0
@@ -155,8 +153,6 @@ def main():
                 #####
                 ## Compute class_reg loss ##
                 table_fgs_positive_proposals, cls_mask = get_target_mask(filtered_proposals, annotation)
-                #TODO here, filter the number of positive and background
-                todo here !
                 clss_reg_bbox_loss = get_target_distance2(raw_reg, filtered_proposals, annotation, table_fgs_positive_proposals)
                 if (cls_mask != -1.0).sum() > 0:
                     clss_reg_prob_loss = compute_cls_reg_prob_loss(raw_cls, cls_mask)

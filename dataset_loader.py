@@ -8,6 +8,7 @@ import os
 from pprint import pprint
 from loss import anchor_labels
 from tqdm import tqdm
+import config
 
 # TODO: normalizar os dados de acordo com : https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
 
@@ -23,7 +24,7 @@ class MyDataset(Dataset):
                 on a sample.
         """
 
-        original_img_size = (256, 256)
+        original_img_size = (256, 256)  # should get from data
 
         with open(csv_file) as f:
             lines = f.readlines()
@@ -47,7 +48,7 @@ class MyDataset(Dataset):
         self.files_annot = data
         self.img_dir = img_dir
         self.input_img_size = input_img_size
-        self.batch_size = 256
+        self.batch_size = config.rpn_batch_size # it is confusing putting this stuff in the dataloader
         self.half_batch_size = int(0.5 * self.batch_size)
 
     def __len__(self):
@@ -115,11 +116,9 @@ def inv_normalize(t):
 
 def get_dataloader(anchors_parameters, valid_anchors):
 
-    # input_img_size = (128, 128)
-    input_img_size = (224, 224)
-    dataset = MyDataset(img_dir='dataset/mini_day/', csv_file='dataset/mini_day.csv', input_img_size=input_img_size, anchors_parameters=anchors_parameters, valid_anchors=valid_anchors)
+    dataset = MyDataset(img_dir=config.img_folder, csv_file=config.annotations_file, input_img_size=config.input_img_size, anchors_parameters=anchors_parameters, valid_anchors=valid_anchors)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
-    return dataloader, input_img_size
+    return dataloader
 
 
 def _inplace_adjust_bbox2offset(bbox_data_list):

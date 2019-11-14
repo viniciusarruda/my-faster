@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
 import torchvision
 from torchvision import datasets, models, transforms
 import matplotlib.pyplot as plt
 import time
 import os
 import copy
+import math
+import config
 
 ##
 # TODO: Testar:
@@ -27,6 +28,9 @@ class FeatureExtractorNetComplete(nn.Module):
 
     def  __init__(self):
         super(FeatureExtractorNetComplete, self).__init__()
+
+        h, w = config.input_img_size
+        assert h == w
 
         full_model = models.resnet18(pretrained=True)
 
@@ -55,7 +59,7 @@ class FeatureExtractorNetComplete(nn.Module):
 
         self.out_dim = 256 # 12
         self.receptive_field_size = 16 #4 # 2 ^ number_of_maxpool_stride_2
-        self.feature_extractor_size = 14 #32
+        self.feature_extractor_size = math.ceil(h / self.receptive_field_size) #14 #32
 
     # overriding nn.Module.train()
     def train(self, mode=True):

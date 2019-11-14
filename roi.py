@@ -26,8 +26,8 @@ class ROI(nn.Module):
 
         # fazer um estudo do tradeoff de deixar o floor e ceil ou n
         # I put floor and ceil to get the whole feature information, otherwise will truncate the feature size covered by the proposal
-        roi = torch.stack((x, y, w, h), dim=2).long() # long -> torch.int64
-        # roi = torch.stack((x.floor(), y.floor(), w.ceil(), h.ceil()), dim=2).long() # long -> torch.int64
+        # roi = torch.stack((x, y, w, h), dim=2).long() # long -> torch.int64
+        roi = torch.stack((x.floor(), y.floor(), w.ceil(), h.ceil()), dim=2).long() # long -> torch.int64
 
         batch_rois = []
 

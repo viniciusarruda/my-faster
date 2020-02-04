@@ -187,7 +187,7 @@ def show_anchors(anchors_np, valid_anchors_np, image_size):
     print('A total of {} valid anchors.'.format(anchors_np.shape[0]))
 
     real.show()
-    exit()
+    # exit()
 
 
 def show_associated_positive_anchors(img_number, anchors_np, valid_anchors_np, table_gts_positive_anchors_np, annotation_np, image_size):

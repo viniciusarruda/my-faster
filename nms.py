@@ -59,4 +59,26 @@ def _nms(bboxes, probs_object):
 
     return bboxes, probs_object
 
+
+
+
+# def test_nms():
+#     import torchvision
+#     boxes = torch.rand(5, 4)
+#     boxes[:, 2:] += torch.rand(5, 2)
+#     scores = torch.randn(5)
+
+#     print(boxes)
+#     print(scores)
+
+#     keep = torchvision.ops.nms(boxes, scores, 0.7)
+#     print(keep)
+
+#     boxes, scores = _nms(boxes, scores)
+
+#     print(boxes)
+#     print(scores)
+
     
+# if __name__ == "__main__":
+#     test_nms()

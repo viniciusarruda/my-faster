@@ -231,7 +231,7 @@ class RPN(nn.Module):
             if a0 >= 0 and a1 >= 0 and a2 <= self.input_img_size[1] - 1 and a3 <= self.input_img_size[0] - 1:
                 valid_mask[i] = 1
 
-        valid_mask = torch.from_numpy(valid_mask)
+        valid_mask = torch.from_numpy(valid_mask).to(torch.bool)
 
         return anchors, valid_mask #anchors_center_cols_offset, anchors_center_rows_offset, aw, ah
 

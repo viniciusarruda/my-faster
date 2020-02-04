@@ -12,8 +12,16 @@ class ROI(nn.Module):
         self.out_dim = 7
         self.input_img_size = input_img_size
 
-
-    # so segui os tutoriais, mas isso é ROIPool, ROIAlign, ROI ??
+    # NOTE/TODO:
+    # This is a really simple RoI implementation
+    # This is not a RoIAlign or other RoI implemented in papers
+    # It works, but is not what people are using
+    # About RoIAlign:
+    #           https://chao-ji.github.io/jekyll/update/2018/07/20/ROIAlign.html
+    #           https://medium.com/@fractaldle/mask-r-cnn-unmasked-c029aa2f1296
+    # I coud not found implementations in plain pytorch or python.
+    # The other implementations are using pure C and Cuda and binding to python.
+    # Also, I can embed this functions here: https://pytorch.org/docs/stable/torchvision/ops.html
     def forward(self, proposals, features):
 
         fx = features.size(2) / self.input_img_size[0]  # ja sei a priori

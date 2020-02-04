@@ -10,8 +10,23 @@ from classifier_regressor import ClassifierRegressor
 from see_results import see_rpn_results, show_training_sample, see_final_results, see_rpn_final_results, show_anchors, show_masked_anchors, LossViz
 from loss import anchor_labels, get_target_distance, compute_rpn_prob_loss, get_target_distance2, get_target_mask, compute_cls_reg_prob_loss
 from PIL import Image
-from tqdm import tqdm
+from tqdm import tqdm, trange
 import config
+
+
+import traceback
+import warnings
+import sys
+
+def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
+
+    log = file if hasattr(file,'write') else sys.stderr
+    traceback.print_stack(file=log)
+    log.write(warnings.formatwarning(message, category, filename, lineno, line))
+    exit()
+
+warnings.showwarning = warn_with_traceback
+
 
 torch.manual_seed(0)
 torch.backends.cudnn.deterministic = True
@@ -23,49 +38,6 @@ np.random.seed(0)
 # BUG 
 # NOTE
 
-#####################################
-
-### About the image standard ###
-# The images are in the format I(n_rows, n_cols), and indexed always as (r, c)
-# The height and the width of an image is handled in the code as n_rows and n_cols, respectively.
-# The (0, 0) point is at the top left corner of the image
-
-### About the tensor standard ###
-
-
-### ###
-# The format of bounding box is in x,y,n_rows,n_cols unless the variable name contains a bbox word.
-
-#####################################
-
-# NOTE: For each modification, test and do not move until obtain the same anterior result (or better) 
-# DONE: Assert the forward pass.
-# DODE: Implement the loss and assert its corectness
-# DONE: Implement the backward and assert its correctness
-# TODO: Organize the code
-# TODO: Increase the size of the input image
-# TODO: Increase the number of images in the training set
-# TODO: Implement the resnet as feature extractor
-# TODO: Fix the parameters for the new feature extractor
-# TODO: Implement the training strategy correctly
-# TODO: Use the newest PyTorch version 
-
-# TODO: during training, use only the valid anchors, but in test, all anchors..
-
-# TODO: use image with different size (no multiple yet, but different sizes)
-# TODO: more anchor ratios and scales
-# TODO: single image with two (and then more) objects
-# TODO: multiple images
-# TODO: RCNN_top
-
-# TODO: invalid anchors can be setted to -1 on labels ? (as dont care..)
-# TODO: When processing the ground truths, show warnings when a certain GT box have no associated positive anchor
-
-# TODO NOW: what is the behavior when is there a not assigned gt ?
-# checar este behavior..
-# eliminar esse gt caso for isso mesmo que eu estiver pensando, pois n vai servir de nada
-
-# partir para o treino com batch balanceado!
 
 def main():
 
@@ -102,7 +74,7 @@ def main():
 
     l = len(dataloader)
 
-    for e in tqdm(range(1, config.epochs+1)):
+    for e in trange(1, config.epochs+1):
 
         rpn_prob_loss_epoch, rpn_bbox_loss_epoch, rpn_loss_epoch = 0, 0, 0
         clss_reg_prob_loss_epoch, clss_reg_bbox_loss_epoch, clss_reg_loss_epoch = 0, 0, 0
@@ -125,10 +97,14 @@ def main():
             # print('Proposals size: {}'.format(proposals.size()))
             # print('Probabilities object size: {}'.format(probs_object.size()))
 
+            #####
+            # TODO:
+            # remove here the batch channel for the above tensors
+            # adapt the functions below
+            #####
+
 
             ## Compute RPN loss ##
-            # labels, table_gts_positive_anchors = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation)
-            # labels, table_gts_positive_anchors = labels.to(device), table_gts_positive_anchors.to(device)
             rpn_bbox_loss = get_target_distance(proposals, rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation, table_gts_positive_anchors)
             rpn_prob_loss = compute_rpn_prob_loss(cls_out, labels)
             #####
@@ -180,10 +156,11 @@ def main():
             optimizer.step()
 
         lv.record(e, rpn_prob_loss_epoch / l, rpn_bbox_loss_epoch / l, rpn_loss_epoch / l, clss_reg_prob_loss_epoch / l, clss_reg_bbox_loss_epoch / l, clss_reg_loss_epoch / l)
-        print('\nEpoch {}: rpn_prob_loss: {} + rpn_bbox_loss: {} = {}'.format(e, rpn_prob_loss_epoch / l, rpn_bbox_loss_epoch / l, rpn_loss_epoch / l))
-        print('       : clss_reg_prob_loss: {} + clss_reg_bbox_loss: {} = {}'.format(clss_reg_prob_loss_epoch / l, clss_reg_bbox_loss_epoch / l, clss_reg_loss_epoch / l))
-        print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
-        print()
+        s = '\nEpoch {}: rpn_prob_loss: {} + rpn_bbox_loss: {} = {}'.format(e, rpn_prob_loss_epoch / l, rpn_bbox_loss_epoch / l, rpn_loss_epoch / l)
+        s += '\n       : clss_reg_prob_loss: {} + clss_reg_bbox_loss: {} = {}'.format(clss_reg_prob_loss_epoch / l, clss_reg_bbox_loss_epoch / l, clss_reg_loss_epoch / l)
+        # print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
+        # print()
+        tqdm.write(s)
 
         if e % 10 == 0:
             

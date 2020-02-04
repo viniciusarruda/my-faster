@@ -190,11 +190,11 @@ def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_
     # set positive anchors
     idxs = ious > positive_threshold
     idxs_cond = torch.argmax(ious, dim=0)
-    cond = torch.zeros(batch_size, anchors.size(0), dtype=torch.uint8) # this is to handle the possibility of an anchor to belong to more than one gt
-    cond[idxs_cond, range(idxs_cond.size(0))] = 1                      # it will only belong to the maximum iou
+    cond = torch.zeros(batch_size, anchors.size(0), dtype=torch.bool) # this is to handle the possibility of an anchor to belong to more than one gt
+    cond[idxs_cond, range(idxs_cond.size(0))] = True                      # it will only belong to the maximum iou
     idxs_amax = torch.argmax(ious, dim=1)  # this may introduce an anchor to belong to more than one gt
     idxs = idxs & cond                     # and to check (get the second argmax) it will be expensive
-    idxs[range(idxs_amax.size(0)), idxs_amax] = 1.0
+    idxs[range(idxs_amax.size(0)), idxs_amax] = True
     mask[idxs] = 1.0
 
     # set negative anchors
@@ -260,8 +260,8 @@ def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0
     # set positive anchors
     idxs = ious > high_threshold
     idxs_cond = torch.argmax(ious, dim=0)
-    cond = torch.zeros(batch_size, filtered_proposals.size(1), dtype=torch.uint8) # this is to handle the possibility of an anchor to belong to more than one gt
-    cond[idxs_cond, range(idxs_cond.size(0))] = 1                      # it will only belong to the maximum iou
+    cond = torch.zeros(batch_size, filtered_proposals.size(1), dtype=torch.bool) # this is to handle the possibility of an anchor to belong to more than one gt
+    cond[idxs_cond, range(idxs_cond.size(0))] = True                      # it will only belong to the maximum iou
     # idxs_amax = torch.argmax(ious, dim=1)  # this may introduce an anchor to belong to more than one gt, and to check (get the second argmax) it will be expensive
     idxs = idxs & cond    
     # idxs[range(idxs_amax.size(0)), idxs_amax] = 1.0 # bellow is written "I think that this cannot be here.."

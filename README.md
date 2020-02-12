@@ -27,9 +27,11 @@
 - [x] Implement the backward and assert its correctness
 - [x] Make some tests with the existing dataset to understand where I am
 - [x] Use the newest PyTorch version (1.4 stable)
-- [ ] Use the built-in RoIAlign (do not delete the old, just comment or something similar)
+- [x] Use the built-in RoIAlign (do not delete the old, just comment or something similar)
 - [ ] Modify NMS to output the same as the ops.nms() (make a hard unit test)
 - [ ] Use the built-in NMS (do not delete the old, just comment or something similar)
+- [ ] Check about the pattern of bbox. I really need to consider bbox as pixels position or continuous ? 
+      If continuous, makes sense to calculade the area as w1 - w0 + 1 (so, re-check the NMS) ?
 - [ ] Check these (from https://github.com/aleju/papers/blob/master/neural-nets/Faster_R-CNN.md):
     - [ ] Positive examples are anchor boxes that have an IoU with a ground truth bounding box of 0.7 or more. If no anchor  point has such an IoU with a specific box, the one with the highest IoU is used instead.
     - [ ] They use 128 positive examples and 128 negative ones. If they can't come up with 128 positive examples, they add more negative ones.
@@ -62,7 +64,7 @@
 # ------------------------------------------------------------------------
 # Further TODO
 # ------------------------------------------------------------------------
-- [ ] Implement my own RoIAlign (can be in python instead of C), should give similar results to the built-in (but keep the faster as default)
+- [ ] Implement my own RoIAlign (can be in python instead of C), should give similar results to the built-in (but keep the faster as default) (https://stackoverflow.com/questions/60060016/why-does-roi-align-not-seem-to-work-in-pytorch)
 - [ ] Implement my own NMS, should give similar results to the built-in (but keep the faster as default)
 
 ---

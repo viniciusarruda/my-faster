@@ -18,5 +18,11 @@ epochs = 1000
 rpn_anchor_ratios = [0.8, 1, 1.2]  #[1] #[0.5, 1, 2] 
 rpn_anchor_scales = [3.5, 4, 4.5]  #[4] #[8, 16, 32]
 
-# Number of proposals kept before NMS
+# Number of top (according to score) proposals kept before NMS. Zero to not filter.
 pre_nms_top_n = 30
+
+# Number of top (according to score) proposals kept after NMS. Zero to not filter.
+pos_nms_top_n = 0
+
+# NMS threshold
+nms_threshold = 0.7

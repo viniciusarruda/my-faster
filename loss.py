@@ -286,9 +286,11 @@ def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0
     # print((cls_mask == -1).sum(), (cls_mask == 0).sum(), (cls_mask == 1).sum())
     # exit()
 
+    # TODO
     if (cls_mask == 1).sum() > 16:
         raise NotImplementedError('Warning, did not implemented!')
 
+    # TODO
     if (cls_mask == 0).sum() > 48:
         raise NotImplementedError('Warning, did not implemented!')
 

@@ -45,8 +45,8 @@ def main():
 
     device = torch.device("cpu")
 
-    # fe_net = FeatureExtractorNet().to(device)
-    fe_net = FeatureExtractorNetComplete().to(device)
+    fe_net = FeatureExtractorNet().to(device)
+    # fe_net = FeatureExtractorNetComplete().to(device)
     rpn_net = RPN(input_img_size=config.input_img_size, feature_extractor_out_dim=fe_net.out_dim, feature_extractor_size=fe_net.feature_extractor_size, receptive_field_size=fe_net.receptive_field_size, device=device).to(device)
     roi_net = ROI(input_img_size=config.input_img_size).to(device)
     clss_reg = ClassifierRegressor(input_img_size=config.input_img_size, input_size=7*7*fe_net.out_dim, n_classes=1).to(device)

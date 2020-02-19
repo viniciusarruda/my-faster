@@ -2,6 +2,14 @@ import torch
 import torchvision
 import config
 
+# TODO: check if I need to check if x0 is greater than x1 e etc.. (the assertion)
+# TODO: keep the +1 standard or no? https://github.com/facebookresearch/Detectron/blob/master/detectron/utils/boxes.py#L23
+
+# fazer o switch para o pytorch e rodar novamente
+# comparar
+# depois com a net mais basica para ambos
+# e dar por terminado isso! bola pra frente e deixa isso como está!
+
 def nms(bboxes, probs_object):
 
     assert bboxes.size(0) == 1
@@ -10,6 +18,13 @@ def nms(bboxes, probs_object):
     probs_object = probs_object[bi, :]
 
     # TODO I think I will leave this here.. 
+    # I want to check degenerate cases. 
+    # How shold I handle it? Get these cases out or leave it?
+    # https://github.com/pytorch/vision/issues/1870
+    # If this assertion is not here:
+    #    The PyTorch implementation will leave the degenerate boxes. (in a natural way)
+    #    In my implementation, the degenerate boxes will be removed.  (in a natural way)
+    #    To imitate the PyTorch implementation behavior, it will have a greater computational cost.
     assert torch.all(bboxes[:, 2] > bboxes[:, 0]) and torch.all(bboxes[:, 3] > bboxes[:, 1]) # just to ensure.. but this is dealt before I think... I am shure !!
     # actually can be assert x1_0 >= x0_0 and y1_0 >= y0_0.. No, because can get 0 for union
 
@@ -25,13 +40,13 @@ def nms(bboxes, probs_object):
     # for while, its output are the identical also quite similar the time spent
     # ------------------------------------------------------------- #
     # If using my own implementation (slower but still effective)
-    keep = _nms(bboxes, probs_object, config.nms_threshold)
+    # keep = _nms(bboxes, probs_object, config.nms_threshold)
     # ------------------------------------------------------------- #
-    # # If using the torchvision implementation
-    # # https://github.com/pytorch/vision/blob/e2a8b4185e2b668b50039c91cdcf81eb4175d765/torchvision/csrc/cpu/nms_cpu.cpp
-    # bboxes[:, 2:] += 1.0  # The implementation doesn't add +1 while computing the width/height.
-    # keep = torchvision.ops.nms(bboxes, probs_object, config.nms_threshold) 
-    # bboxes[:, 2:] -= 1.0  # Undoing the above adjustment
+    # If using the torchvision implementation
+    # https://github.com/pytorch/vision/blob/e2a8b4185e2b668b50039c91cdcf81eb4175d765/torchvision/csrc/cpu/nms_cpu.cpp
+    bboxes[:, 2:] += 1.0  # The implementation doesn't add +1 while computing the width/height.
+    keep = torchvision.ops.nms(bboxes, probs_object, config.nms_threshold) 
+    bboxes[:, 2:] -= 1.0  # Undoing the above adjustment
     # ------------------------------------------------------------- #
 
     bboxes = bboxes[keep, :]
@@ -48,17 +63,12 @@ def nms(bboxes, probs_object):
     return bboxes.unsqueeze(0), probs_object.unsqueeze(0) # unsqueeze for simulating a batch of 1   
 
 
-
 # @profile # uncomment and run kernprof -lv nms.py on terminal
 def _nms(bboxes, probs_object, threshold):
 
     idxs = torch.argsort(probs_object, descending=True)
 
     areas = (bboxes[:, 2] - bboxes[:, 0] + 1.0) * (bboxes[:, 3] - bboxes[:, 1] + 1.0)
-
-    # TODO If keep in above code, remove from here!
-    # assert torch.all(bboxes[:, 2] > bboxes[:, 0]) and torch.all(bboxes[:, 3] > bboxes[:, 1]) # just to ensure.. but this is dealt before I think... I am shure !!
-    # # actually can be assert x1_0 >= x0_0 and y1_0 >= y0_0.. No, because can get 0 for union
 
     keep = []
     while idxs.size(0) > 0:
@@ -83,8 +93,7 @@ def _nms(bboxes, probs_object, threshold):
         iou = intersection / union
 
         idxs = idxs[1:][iou <= threshold]
-
-    # TODO: in case of empty. What the faster implementation does in this case?
+    
     if keep == []:
         return torch.tensor([], dtype=torch.int64)
     else:
@@ -172,9 +181,6 @@ def test_nms():
 
     print(pyto_time)
     print(mine_time)
-
-
-# TODO: check if I need to check if x0 is greater than x1 e etc.. (the assertion)
 
 if __name__ == "__main__":
     test_nms()

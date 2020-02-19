@@ -28,8 +28,10 @@
 - [x] Make some tests with the existing dataset to understand where I am
 - [x] Use the newest PyTorch version (1.4 stable)
 - [x] Use the built-in RoIAlign (do not delete the old, just comment or something similar)
-- [ ] Modify NMS to output the same as the ops.nms() (make a hard unit test)
-- [ ] Use the built-in NMS (do not delete the old, just comment or something similar)
+- [x] Modify NMS to output the same as the ops.nms() (make a hard unit test)
+        -> In fact, it behaves slightly different when handling degenerate boxes,
+           but nothing that gets in the way of performance.
+- [x] Use the built-in NMS (do not delete the old, just comment or something similar)
 - [ ] Check about the pattern of bbox. I really need to consider bbox as pixels position or continuous ? 
       If continuous, makes sense to calculade the area as w1 - w0 + 1 (so, re-check the NMS) ?
 - [ ] Check these (from https://github.com/aleju/papers/blob/master/neural-nets/Faster_R-CNN.md):

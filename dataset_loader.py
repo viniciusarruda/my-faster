@@ -10,9 +10,6 @@ from loss import anchor_labels
 from tqdm import tqdm
 import config
 
-# TODO: normalizar os dados de acordo com : https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
-
-
 class MyDataset(Dataset):
 
     def __init__(self, img_dir, csv_file, input_img_size, anchors_parameters, valid_anchors):
@@ -24,7 +21,7 @@ class MyDataset(Dataset):
                 on a sample.
         """
 
-        original_img_size = (256, 256)  # should get from data
+        original_img_size = (256, 256)  # should get from data, maybe in the __getitem__ function
 
         with open(csv_file) as f:
             lines = f.readlines()
@@ -49,7 +46,8 @@ class MyDataset(Dataset):
         self.img_dir = img_dir
         self.input_img_size = input_img_size
         self.batch_size = config.rpn_batch_size # it is confusing putting this stuff in the dataloader
-        self.half_batch_size = int(0.5 * self.batch_size)
+        self.max_positive_batch_ratio = config.max_positive_batch_ratio
+        self.max_positive_batch_size = int(self.max_positive_batch_ratio * self.batch_size) # put this on config ?
 
     def __len__(self):
         return len(self.files_annot)
@@ -63,44 +61,57 @@ class MyDataset(Dataset):
         image = transforms.ToTensor()(image)
         image = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(image)
 
+        # Because I don't want to modify the original data
+        balanced_labels = labels.clone()
+
         # here, randomly get the batch
-        # print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
-        # TODO: fazer a implementação correta, testar
+        # print((balanced_labels == -1).sum(), (balanced_labels == 0).sum(), (balanced_labels == 1).sum())
+        # TODO -> DONE! : fazer a implementação correta, testar
         # NEXT TODO: fazer o mesmo porem com a segunda parte da rede (25% 75%)
 
-        ### Select up to self.half_batch_size positive anchors
+        # n_positive_anchors = (balanced_labels == 1).sum() # the line below is faster and produce the same result
+        n_positive_anchors = table_gts_positive_anchors.size(0)
+
+        ### Select up to self.max_positive_batch_size positive anchors
         ### The excess is marked as dont care
-        # TODO
-        if (labels == 1).sum() > self.half_batch_size:
-            raise NotImplementedError('Warning, did not implemented!')
+        if n_positive_anchors > self.max_positive_batch_size:
+            # raise NotImplementedError('Warning, did not implemented!')
+            print('\n======\n')
+            print('n_positive_anchors > self.max_positive_batch_size')
+            print('OBSERVE IF IT IS BEHAVING RIGHT! IT SHOULD!')
+            print('\n======\n')
+            # positive_anchors_idxs = (balanced_labels == 1).nonzero().squeeze() # the line below is faster and produce the same result
+            positive_anchors_idxs = table_gts_positive_anchors[:, 1]
+            tmp_idxs = torch.randperm(n_positive_anchors)[:n_positive_anchors - self.max_positive_batch_size]
+            idxs_to_suppress = positive_anchors_idxs[tmp_idxs]
+            balanced_labels[idxs_to_suppress] = -1 # mark them as don't care
+            n_positive_anchors = self.max_positive_batch_size
+            # TODO -> To Check!
+            # The table_gts_positive_anchors is not consistent with the labels.
+            # Should be consistent? Or this balancing is just for the cross-entropy loss?
 
-        # should keep the table_gts_positive_anchors consistent with the positive labels
-        # print(table_gts_positive_anchors)
-
-        ### Select self.batch_size - positive anchors size negative anchors
-        ### I think the excess is marked as dont care too (did not confirmed)
-        negative = (labels == 0).nonzero()[:, 0]
-        n_positive_anchors = (labels == 1).sum()
+        ### Fill the remaining batch with negative anchors
+        negative_anchors_idxs = (balanced_labels == 0).nonzero().squeeze()
+        n_negative_anchors = negative_anchors_idxs.size(0)
         n_anchors_to_complete_batch = self.batch_size - n_positive_anchors
 
-        if n_anchors_to_complete_batch > negative.size(0):
+        if n_anchors_to_complete_batch > n_negative_anchors:
+            # TODO: There is less anchors than the batch size.. just use the available ones?
             raise NotImplementedError('Warning, did not implemented! How to proceed with this?')
-            # There is less anchors than the batch size.. just use the available ones ?
 
-        idxs = torch.randperm(negative.size(0))[:negative.size(0) - n_anchors_to_complete_batch]
-        negative_idxs = negative[idxs]
+        tmp_idxs = torch.randperm(n_negative_anchors)[:n_negative_anchors - n_anchors_to_complete_batch]
+        idxs_to_suppress = negative_anchors_idxs[tmp_idxs]
+        # TODO -> To Check! 
+        # I think the excess is also marked as dont care too (didn't confirm - didn't find anything about it)
+        balanced_labels[idxs_to_suppress] = -1 # mark them as don't care
 
-        new_labels = labels.detach().clone() # it is really needed to detach and clone ? (can much effort for the same effect)
-        new_labels[negative_idxs] = -1 # mark them as dont care
-
-        # print('-----')
+        # You can see the difference before/after balancing the labels:
+        # print('---------')
         # print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
-        # print((new_labels == -1).sum(), (new_labels == 0).sum(), (new_labels == 1).sum())
+        # print((balanced_labels == -1).sum(), (balanced_labels == 0).sum(), (balanced_labels == 1).sum())
         # print('---------')
 
-        # exit()
-
-        return image, bboxes, new_labels, table_gts_positive_anchors
+        return image, bboxes, balanced_labels, table_gts_positive_anchors
 
 
 def inv_normalize(t):

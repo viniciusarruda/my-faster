@@ -154,7 +154,7 @@ def smooth_l1(x, sigma=3):
 
 
 
-def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_threshold=0.7): # era 0.3 no negative..
+def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_threshold=0.7):
     # tem como simplificar e otimizar..
     
     anchors = anchors[valid_anchors, :]
@@ -187,31 +187,53 @@ def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_
 
         ious[bi, :] = iou
 
-    # set positive anchors
-    idxs = ious > positive_threshold
-    idxs_cond = torch.argmax(ious, dim=0)
-    cond = torch.zeros(batch_size, anchors.size(0), dtype=torch.bool) # this is to handle the possibility of an anchor to belong to more than one gt
-    cond[idxs_cond, range(idxs_cond.size(0))] = True                      # it will only belong to the maximum iou
-    idxs_amax = torch.argmax(ious, dim=1)  # this may introduce an anchor to belong to more than one gt
-    idxs = idxs & cond                     # and to check (get the second argmax) it will be expensive
-    idxs[range(idxs_amax.size(0)), idxs_amax] = True
-    mask[idxs] = 1.0
 
-    # set negative anchors
+    # Set negative anchors
+    # This should be first because the next instructions can override the mask
     idxs = ious < negative_threshold
     mask[idxs] = -1.0
 
-    # mask[bi, iou > positive_threshold] = 1.0
-    # mask[bi, iou < negative_threshold] = 0.0
-    # mask[bi, torch.argmax(iou)] = 1.0 # se mudar para fazer com bath tem que colocar dim=1 ou outra dependendo do que for
-    # else, mask = -1.0 (it is initialized with zeros - 1)    dont care
+    # Set positive anchors
+    idxs = ious > positive_threshold
+    
+    # It is possible that a certain anchor is positive assigned to more than one box.
+    # So to handle this issue, this snippet makes the anchor belong only to the box with maximum IoU.
+    idxs_cond = torch.argmax(ious, dim=0)
+    cond = torch.zeros(batch_size, anchors.size(0), dtype=torch.bool)
+    cond[idxs_cond, range(idxs_cond.size(0))] = True                 
+    idxs = idxs & cond                     
+    
+    # It is possible that a certain box has no positive anchor assigned. This snippet handles this issue.
+    # First, a mask with the available anchors is built.
+    cond = torch.ones(batch_size, anchors.size(0), dtype=torch.bool)
+    cond[:, idxs.nonzero()[:, 1]] = False # Removes the already assigned anchors.
+    cond[idxs.nonzero()[:, 0], :] = False # Removes the box which already has an assigned anchor.
+    # Then, the max IoU is obtained, generating a mask with it.
+    idxs_amax = torch.argmax(ious, dim=1)
+    amax_mask = torch.zeros(batch_size, anchors.size(0), dtype=torch.bool)
+    amax_mask[range(idxs_amax.size(0)), idxs_amax] = True
+    # Finally, the final mask is composed.
+    # Only the argmax IoU that was not already assigned that can be used to assign the remaining boxes.
+    idxs = idxs | (amax_mask & cond)  # always mutual exclusive due to `cond`, i.e., (idxs & (amax_mask & cond)).sum() is always zero.
 
-    # idx_gt, idx_positive_anchor
-    table_gts_positive_anchors = (mask == 1.0).nonzero() 
+    # Here, idxs tries to assign at least one positive anchor to each box.
+    # There is no anchor belonging to more than one box!
+    # It is possible that a certain box doesn't have an assigned anchor because, 
+    # and only because, the anchor which it has the higher IoU it was already assigned to another box with an even higher IoU, and
+    # it makes no sense to assign another unused anchor with a lower IoU because the algorithm may be "confused", i.e., resulting in an unstable training.
 
+    # Finally the mask is applied
+    mask[idxs] = 1.0
+
+    # Get a table in the following format: [box_idx, anchor_idx] relating the box with its respective positive assigned anchor
+    table_gts_positive_anchors = (mask == 1.0).nonzero()
+
+    # Get a mask with anchors which are positive, don't care or negative.
     mask, _ = torch.max(mask, dim=0)
 
-    # reverse to middle -> -1, negative -> 0 and positive -> 1
+    # Reverse the standard to later facilitate the use
+    # It was: middle (don't care) -> 0, negative -> -1 and positive -> 1
+    # And now: middle (don't care) -> -1, negative -> 0 and positive -> 1
     idxs_middle = mask == 0.0
     idxs_negative = mask == -1.0
 

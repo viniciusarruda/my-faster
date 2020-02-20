@@ -19,6 +19,8 @@ class ROI(nn.Module):
         # fy = features.size(3) / self.input_img_size[1]  # ja sei a priori
 
         # TODO commentint out the above and setting spatial_scale to 1 shoud be equal, according to test_nms.py file
+        # NOTE Actually, I think it is not possible. I think to obtain this behavior I should also resize the features.
+        # or no? todo, tothink
         # proposals[:, :, 0] *= fx
         # proposals[:, :, 1] *= fy
         # proposals[:, :, 2] *= fx

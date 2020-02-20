@@ -5,10 +5,6 @@ import config
 # TODO: check if I need to check if x0 is greater than x1 e etc.. (the assertion)
 # TODO: keep the +1 standard or no? https://github.com/facebookresearch/Detectron/blob/master/detectron/utils/boxes.py#L23
 
-# fazer o switch para o pytorch e rodar novamente
-# comparar
-# depois com a net mais basica para ambos
-# e dar por terminado isso! bola pra frente e deixa isso como está!
 
 def nms(bboxes, probs_object):
 

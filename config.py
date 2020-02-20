@@ -10,6 +10,7 @@ input_img_size = (224, 224) # (600, 600)
 
 # RPN batch size
 rpn_batch_size = 256
+max_positive_batch_ratio = 0.5
 
 # Number of epochs to run
 epochs = 1000

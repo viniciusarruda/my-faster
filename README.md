@@ -36,12 +36,12 @@
     - [x] Positive examples are anchor boxes that have an IoU with a ground truth bounding box of 0.7 or more. If no anchor  point has such an IoU with a specific box, the one with the highest IoU is used instead.
     - [x] They use 128 positive examples and 128 negative ones. If they can't come up with 128 positive examples, they add more negative ones.
     - [x] Look the test topic and also check if I am doing right
-    - [ ] Balance the training also for the regressor.
-    - [ ] Check the TODOs in the dataset_loader file
-- [ ] Clean/comment/review loss.py file
+    - [x] Balance the training also for the regressor.
+- [ ] Clean/comment/review loss.py file (check to remove duplicata as calculating the iou)
 - [ ] Document as in https://realpython.com/documenting-python-code/
 - [ ] Remove the batch loop, since it is only one image (to add more images in the batch later, but I think I wont)
 - [ ] Improve the visualization including verbose information for debugging (Tensorboard)
+    - [ ] Include a heatmap visualization of the features right before the RPN (maybe an insight to use attention here)
 - [ ] Check about the pattern of bbox. I really need to consider bbox as pixels position or continuous ? 
       If continuous, makes sense to calculade the area as w1 - w0 + 1 (so, re-check the NMS) ?
 ---------- Well done! Keep going! --------------
@@ -70,7 +70,7 @@
 # Further TODO
 # ------------------------------------------------------------------------
 - [ ] Implement my own RoIAlign (can be in python instead of C), should give similar results to the built-in (but keep the faster as default) (https://stackoverflow.com/questions/60060016/why-does-roi-align-not-seem-to-work-in-pytorch)
-- [ ] Implement my own NMS, should give similar results to the built-in (but keep the faster as default)
+- [x] Implement my own NMS, should give similar results to the built-in (but keep the faster as default)
 
 ---
 # ------------------------------------------------------------------------

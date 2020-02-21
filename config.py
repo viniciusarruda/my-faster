@@ -1,4 +1,5 @@
 
+# TODO: standardize to more intuitive names and capslock?
 
 # Dataset used to train
 img_folder = 'dataset/one_day/'
@@ -11,6 +12,10 @@ input_img_size = (224, 224) # (600, 600)
 # RPN batch size
 rpn_batch_size = 256
 max_positive_batch_ratio = 0.5
+
+# Classifier/Regressor batch size
+batch_size = 128
+fg_fraction = 0.25
 
 # Number of epochs to run
 epochs = 1000

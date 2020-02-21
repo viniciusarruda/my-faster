@@ -5,7 +5,6 @@ import numpy as np
 from torchvision import transforms
 import torch
 import os
-from pprint import pprint
 from loss import anchor_labels
 from tqdm import tqdm
 import config
@@ -80,6 +79,7 @@ class MyDataset(Dataset):
             print('n_positive_anchors > self.max_positive_batch_size')
             print('OBSERVE IF IT IS BEHAVING RIGHT! IT SHOULD!')
             print('\n======\n')
+            exit()
             # positive_anchors_idxs = (balanced_labels == 1).nonzero().squeeze() # the line below is faster and produce the same result
             positive_anchors_idxs = table_gts_positive_anchors[:, 1]
             tmp_idxs = torch.randperm(n_positive_anchors)[:n_positive_anchors - self.max_positive_batch_size]
@@ -95,8 +95,10 @@ class MyDataset(Dataset):
         n_negative_anchors = negative_anchors_idxs.size(0)
         n_anchors_to_complete_batch = self.batch_size - n_positive_anchors
 
-        if n_anchors_to_complete_batch > n_negative_anchors:
+        if n_anchors_to_complete_batch >= n_negative_anchors:
             # TODO: There is less anchors than the batch size.. just use the available ones?
+            # If use the available, take care with the negative indexes in the line below
+            # If so, use the same snippet as in get_target_mask() in loss.py
             raise NotImplementedError('Warning, did not implemented! How to proceed with this?')
 
         tmp_idxs = torch.randperm(n_negative_anchors)[:n_negative_anchors - n_anchors_to_complete_batch]

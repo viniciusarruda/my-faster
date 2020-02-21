@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from rpn import RPN
 from bbox_utils import offset2bbox
 import numpy as np
-
+import config
 
 def smooth_l1(x, sigma=3):
 
@@ -24,136 +24,6 @@ def smooth_l1(x, sigma=3):
     return ret
 
 
-
-# def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_threshold=0.7): # era 0.3 no negative..
-#     # tem como simplificar e otimizar..
-    
-#     anchors = anchors[valid_anchors, :]
-
-#     batch_size = gts.size(0) # number of annotations for one image
-#     mask = torch.zeros(batch_size, anchors.size(0)) - 1.0
-
-#     if batch_size != 1:
-#         print('WARNING: IMPLEMENT THE MASK CORRECTLY, EVEN FOR THE CASE IF ONE ANCHOR BELONGS TO TWO GTS. ALSO, ONLY ONE ARGMAX')
-#         exit()
-    
-#     for bi in range(batch_size):
-
-#         anchors_bbox = torch.zeros(anchors.size(), dtype=anchors.dtype, device=anchors.device)
-#         anchors_bbox[:, 0] = anchors[:, 0] - 0.5 * (anchors[:, 2] - 1)  # como proceder com o lance do -1 ou +1 nesse caso ? na conversão dos bbox2offset e vice versa ?
-#         anchors_bbox[:, 1] = anchors[:, 1] - 0.5 * (anchors[:, 3] - 1)  # cuidadooooooooo p anchor eh assim, mas para proposal n .. caso for gerar label para proposal..
-#         anchors_bbox[:, 2] = anchors_bbox[:, 0] + anchors[:, 2] - 1
-#         anchors_bbox[:, 3] = anchors_bbox[:, 1] + anchors[:, 3] - 1
-
-#         anchors_bbox_area = anchors[:, 2] * anchors[:, 3]
-
-#         gt_area = gts[bi, 2] * gts[bi, 3]
-
-#         x0 = torch.max(anchors_bbox[:, 0], gts[bi, 0])
-#         y0 = torch.max(anchors_bbox[:, 1], gts[bi, 1])
-#         x1 = torch.min(anchors_bbox[:, 2], gts[bi, 0] + gts[bi, 2] - 1)
-#         y1 = torch.min(anchors_bbox[:, 3], gts[bi, 1] + gts[bi, 3] - 1)
-
-#         intersection = torch.clamp(x1 - x0 + 1, min=0) * torch.clamp(y1 - y0 + 1, min=0)
-
-#         union = anchors_bbox_area + gt_area - intersection
-#         iou = intersection / union
-
-#         mask[bi, iou > positive_threshold] = 1.0
-#         mask[bi, iou < negative_threshold] = 0.0
-#         mask[bi, torch.argmax(iou)] = 1.0 # se mudar para fazer com bath tem que colocar dim=1 ou outra dependendo do que for
-#         # else, mask = -1.0 (it is initialized with zeros - 1)    dont care
-
-#     # print((mask == -1.0).sum(), (mask == 0.0).sum(), (mask == 1.0).sum())
-
-#     # idx_gt, idx_positive_anchor
-#     table_gts_positive_anchors = (mask == 1.0).nonzero()
-
-#     mask = torch.squeeze(mask)
-
-#     return mask, table_gts_positive_anchors
-
-# TODO:
-# Selecionar 128 anchoras negativas aleatoriamente
-# selecionar 128 anchoras positivas aleatoriamente
-# def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_threshold=0.7): # era 0.3 no negative..
-#     # tem como simplificar e otimizar..
-    
-#     anchors = anchors[valid_anchors, :]
-
-#     batch_size = gts.size(0) # number of annotations for one image
-#     mask = torch.zeros(batch_size, anchors.size(0)) - 1.0
-
-#     anchors_bbox = torch.zeros(anchors.size(), dtype=anchors.dtype, device=anchors.device) # or should copy to not cause any side effects later
-    
-#     for bi in range(batch_size):
-
-#         max_iou, max_iou_idx = None, None
-
-#         for ai in range(anchors_bbox.size(0)):
-
-#             anchors_bbox[ai, 0] = anchors[ai, 0] - 0.5 * (anchors[ai, 2] - 1)  # como proceder com o lance do -1 ou +1 nesse caso ? na conversão dos bbox2offset e vice versa ?
-#             anchors_bbox[ai, 1] = anchors[ai, 1] - 0.5 * (anchors[ai, 3] - 1)  # cuidadooooooooo p anchor eh assim, mas para proposal n .. caso for gerar label para proposal..
-#             anchors_bbox[ai, 2] = anchors_bbox[ai, 0] + anchors[ai, 2] - 1
-#             anchors_bbox[ai, 3] = anchors_bbox[ai, 1] + anchors[ai, 3] - 1
-
-#             anchors_bbox_area = anchors[ai, 2] * anchors[ai, 3]
-
-#             gt_area = gts[bi, 2] * gts[bi, 3]
-
-#             x0 = torch.max(anchors_bbox[ai, 0], gts[bi, 0])
-#             y0 = torch.max(anchors_bbox[ai, 1], gts[bi, 1])
-#             x1 = torch.min(anchors_bbox[ai, 2], gts[bi, 0] + gts[bi, 2] - 1)
-#             y1 = torch.min(anchors_bbox[ai, 3], gts[bi, 1] + gts[bi, 3] - 1)
-
-#             intersection = torch.clamp(x1 - x0 + 1, min=0) * torch.clamp(y1 - y0 + 1, min=0)
-
-#             union = anchors_bbox_area + gt_area - intersection
-#             iou = intersection / union
-
-#             if iou > positive_threshold:
-#                 mask[bi, ai] = 1.0
-#             elif iou < negative_threshold:
-#                 mask[bi, ai] = 0.0
-
-#             if max_iou is None or iou > max_iou:
-#                 max_iou = iou
-#                 max_iou_idx = ai
-        
-#         if (mask[bi, :] == 1.0).sum() == 0:            
-#             mask[bi, max_iou_idx] = 1.0
-
-#             # mask[bi, iou > positive_threshold] = 1.0
-#             # mask[bi, iou < negative_threshold] = 0.0
-#             # mask[bi, torch.argmax(iou)] = 1.0 # se mudar para fazer com bath tem que colocar dim=1 ou outra dependendo do que for
-#             # else, mask = -1.0 (it is initialized with zeros - 1)    dont care
-
-#     # print((mask == -1.0).sum(), (mask == 0.0).sum(), (mask == 1.0).sum())
-
-#     # idx_gt, idx_positive_anchor
-#     table_gts_positive_anchors = (mask == 1.0).nonzero()
-
-#     # print(table_gts_positive_anchors)
-
-#     # generate a clean mask (rename ?)
-#     clean_mask = torch.zeros(anchors_bbox.size(0)) - 1.0
-#     for ai in range(anchors_bbox.size(0)):
-
-#         if (mask[:, ai] == 1.0).sum() > 0:
-#             clean_mask[ai] = 1.0
-#         elif (mask[:, ai] == 0.0).sum() == batch_size:
-#             clean_mask[ai] = 0.0
-
-#     # WARNING: IT IS POSSIBLE TO ASSIGN ONE ANCHOR TO MORE THAN ONE GT,
-#     # THE CORRECT IS TO ASSIGN AN ANCHOR TO A GT IN WHICH COMPUTED THE GREATEST IOU
-#     # FOR THE CURRENT DATA THIS IS NOT A PROBLEM
-
-#     # print((clean_mask == -1.0).sum(), (clean_mask == 0.0).sum(), (clean_mask == 1.0).sum())
-
-#     return clean_mask, table_gts_positive_anchors
-
-
-
 def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_threshold=0.7):
     # tem como simplificar e otimizar..
     
@@ -163,7 +33,7 @@ def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_
     mask = torch.zeros(batch_size, anchors.size(0))
     ious = torch.zeros(batch_size, anchors.size(0))
     
-    for bi in range(batch_size):
+    for bi in range(batch_size): # maybe I can vectorize this?
 
         anchors_bbox = torch.zeros(anchors.size(), dtype=anchors.dtype, device=anchors.device)
         anchors_bbox[:, 0] = anchors[:, 0] - 0.5 * (anchors[:, 2] - 1)  # como proceder com o lance do -1 ou +1 nesse caso ? na conversão dos bbox2offset e vice versa ?
@@ -205,6 +75,8 @@ def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_
     
     # It is possible that a certain box has no positive anchor assigned. This snippet handles this issue.
     # First, a mask with the available anchors is built.
+    # Remember, they are available because iou < positive_threshold, 
+    # and yet they can be used, trying to not leave any box without an assigned anchor.
     cond = torch.ones(batch_size, anchors.size(0), dtype=torch.bool)
     cond[:, idxs.nonzero()[:, 1]] = False # Removes the already assigned anchors.
     cond[idxs.nonzero()[:, 0], :] = False # Removes the box which already has an assigned anchor.
@@ -253,14 +125,13 @@ def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0
 
     assert filtered_proposals.size(0) == 1 # implemented for batch size 1
 
-    batch_size = gts.size()[0]
+    batch_size = gts.size(0)
     cls_mask = torch.zeros(batch_size, filtered_proposals.size(1))
-    fg_mask = torch.zeros(batch_size, filtered_proposals.size(1))
     ious = torch.zeros(batch_size, filtered_proposals.size(1))
 
     filtered_bbox = offset2bbox(filtered_proposals)
     
-    for bi in range(batch_size):
+    for bi in range(batch_size): # maybe I can vectorize this?
 
         proposals_bbox_area = filtered_proposals[0, :, 2] * filtered_proposals[0, :, 3]
 
@@ -279,75 +150,81 @@ def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0
         ious[bi, :] = iou
 
 
-    # set positive anchors
-    idxs = ious > high_threshold
-    idxs_cond = torch.argmax(ious, dim=0)
-    cond = torch.zeros(batch_size, filtered_proposals.size(1), dtype=torch.bool) # this is to handle the possibility of an anchor to belong to more than one gt
-    cond[idxs_cond, range(idxs_cond.size(0))] = True                      # it will only belong to the maximum iou
-    # idxs_amax = torch.argmax(ious, dim=1)  # this may introduce an anchor to belong to more than one gt, and to check (get the second argmax) it will be expensive
-    idxs = idxs & cond    
-    # idxs[range(idxs_amax.size(0)), idxs_amax] = 1.0 # bellow is written "I think that this cannot be here.."
+    # Set easy background cases as don't care
+    idxs = ious < low_threshold
+    cls_mask[idxs] = -1.0 
 
-    fg_mask[idxs] = 1.0
+    # Set foreground cases
+    idxs = ious > high_threshold
+
+    # TODO: change the name filtered_proposals to rpn_proposals?
+
+    # It is possible that a certain proposal is positive assigned to more than one box.
+    # So to handle this issue, this snippet makes the proposal belong only to the box with maximum IoU.
+    idxs_cond = torch.argmax(ious, dim=0)
+    cond = torch.zeros(batch_size, filtered_proposals.size(1), dtype=torch.bool)
+    cond[idxs_cond, range(idxs_cond.size(0))] = True
+    idxs = idxs & cond    
+
+    # TODO -> To Check! If right, keep commented.
+    # It is possible that a certain box has no positive proposal assigned. 
+    # But, unlike the anchor_labels() function,
+    # I think that I should leave these boxes without a proposal assigned,
+    # because when the RPN adjust these proposals, this function will consider as positive organically.
+
     cls_mask[idxs] = 1.0
 
-    # set negative anchors
-    idxs = ious <= low_threshold
-    cls_mask[idxs] = -1.0   # easy cases (easy background cases), irrelevant
+    # idx_gt, idx_positive_proposal
+    table_fgs_positive_proposals = (cls_mask == 1.0).nonzero() 
 
-    # idx_gt, idx_positive_anchor
-    table_fgs_positive_proposals = (fg_mask == 1.0).nonzero() 
-
-    # do not needed to reverse like the anchor_label()
+    # Do not needed to reverse like the anchor_label()
     cls_mask, _ = torch.max(cls_mask, dim=0)
 
-    #TODO here, filter the number of positive and background
-    # todo here !
+    n_fg_proposals = table_fgs_positive_proposals.size(0)
 
-    # print(table_fgs_positive_proposals)
-    # print((cls_mask == -1).sum(), (cls_mask == 0).sum(), (cls_mask == 1).sum())
-    # exit()
+    # NOTE: The snippet below is identical to the one at the dataset_loader.py.. maybe should make a function with it
 
-    # TODO
-    if (cls_mask == 1).sum() > 16:
-        raise NotImplementedError('Warning, did not implemented!')
+    max_fg_proposals = int(config.fg_fraction * config.batch_size) 
 
-    # TODO
-    if (cls_mask == 0).sum() > 48:
-        raise NotImplementedError('Warning, did not implemented!')
+    ### Select up to max_fg_proposals foreground proposals
+    ### The excess is marked as don't care
+    if n_fg_proposals > max_fg_proposals:
+        # raise NotImplementedError('Warning, did not implemented!')
+        print('\n======\n')
+        print('n_fg_proposals > max_fg_proposals')
+        print('OBSERVE IF IT IS BEHAVING RIGHT! IT SHOULD!')
+        print('\n======\n')
+        exit()
+        fg_proposals_idxs = table_fgs_positive_proposals[:, 1]
+        tmp_idxs = torch.randperm(n_fg_proposals)[:n_fg_proposals - max_fg_proposals]
+        idxs_to_suppress = fg_proposals_idxs[tmp_idxs]
+        cls_mask[idxs_to_suppress] = -1 # mark them as don't care
+        n_fg_proposals = max_fg_proposals
+        # TODO -> To Check!
+        # The table_fgs_positive_proposals is not consistent with the cls_mask.
+        # Should be consistent? Or this balancing is just for the cross-entropy loss?
+    
+    n_proposals_to_complete_batch = config.batch_size - n_fg_proposals
+
+    # if n_proposals_to_complete_batch >= n_bg_proposals:
+    #     # TODO -> see the note below: There is less proposals than the batch size.. just use the available ones?
+    #     # NOTE: I decided to use just the available ones.. since this isn't commented anywhere.
+
+    ### Fill the remaining batch with bg proposals
+    # Annalyze if the `if` below has low rate of entrance.. if so, put the below line inside it to optimize
+    bg_proposals_idxs = (cls_mask == 0).nonzero().squeeze()
+    n_bg_proposals = bg_proposals_idxs.size(0)
+
+    if n_bg_proposals > n_proposals_to_complete_batch:
+        # Sample the bg_proposals to fill the remaining batch space
+        tmp_idxs = torch.randperm(n_bg_proposals)[:n_bg_proposals - n_proposals_to_complete_batch]
+        idxs_to_suppress = bg_proposals_idxs[tmp_idxs]
+        # TODO -> To Check! 
+        # I think the excess is also marked as dont care too (didn't confirm - didn't find anything about it)
+        cls_mask[idxs_to_suppress] = -1 # mark them as don't care
+    # else, just use the available ones, which is the default behavior
 
     return table_fgs_positive_proposals, cls_mask
-
-        # # mask[bi, iou > high_threshold] = 1.0
-        # # mask[bi, torch.argmax(iou)] = 1.0 # se mudar para fazer com bath tem que colocar dim=1 ou outra dependendo do que for
-        # # acredito que este passo acima ainda eh necessario pois pode haver o caso de todo o iou ser abaixo de low_threshold ?!
-        # # else, mask = zero (it is initialized with zeros)bi, iou > high_thresholdbi, iou > high_thresholdbi, iou > high_thresholdbi, iou > high_threshold
-
-        # fg_mask[bi, iou > high_threshold] = 1.0
-        # # fg_mask[bi, torch.argmax(iou)] = 1.0 # I think that this cannot be here..
-        
-        # # logica provisoria, n eh generalizavel 
-        # cls_mask[bi, iou > high_threshold] = 1.0 # carbi, iou > high_thresholdbi, iou > high_threshold
-        # cls_mask[bi, iou <= low_threshold] = -1.0 # easy cases (easy background cases), irrelevant
-        # # cls_mask[bi, (low_threshold < iou) & (iou <= high_threshold)] = 0.0 background -> already done when initialized
-
-        # # I dont know how the real Faster R-CNN leads with this issue.
-        # # I just handled it in this way to keep implementing, but I have not found in any materials how to handle it correctly 
-        # # TODO THIS IS A MUST !
-        # # if (iou > low_threshold).sum() == 0.0:
-        #     # cls_mask[bi, torch.argmax(iou)] = 0.0 # put at least an easy case as a hardy background case to have a class loss
-        #     # input('CLASS MASK WITHOUT ANY VALUE, TYPE ANYTHING TO CONTINUE TO SEE WHAT WILL HAPPEN:')
-
-        # # this print is to help debug the TODO above.. in case of break of code, explore here !
-        # # print((fg_mask == 0).nonzero().size())
-        # # print((fg_mask == 1).nonzero().size())
-
-        # # print((cls_mask == -1).nonzero().size())
-        # # print((cls_mask == 0).nonzero().size())
-        # # print((cls_mask == 1).nonzero().size())
-
-        # # exit()
-
 
 
 def parametrize_bbox(bbox, a_bbox):

@@ -2,12 +2,12 @@ import torch
 import torch.nn.functional as F
 from rpn import RPN
 from bbox_utils import offset2bbox
-import numpy as np
 import config
 
-def smooth_l1(x, sigma=3):
 
-    # tentar melhorar depois com alguma funcao pronta do pytorch de if e aplicas
+# The PyTorch implementation doesn't provide a sigma parameter
+# as the original implementation, so this implementation is kept.
+def smooth_l1(x, sigma=3.0):
 
     sigma2 = sigma * sigma
     x_abs = torch.abs(x)
@@ -18,12 +18,13 @@ def smooth_l1(x, sigma=3):
     false_cond = x_abs - (0.5 / sigma2)
 
     ret = torch.where(cond, true_cond, false_cond)
-
     ret = torch.sum(ret)
 
     return ret
 
 
+# TODO: This function is only called when generating the dataset!?
+#       if so, change the location to other file as is didn't belong here.
 def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_threshold=0.7):
     # tem como simplificar e otimizar..
     
@@ -32,31 +33,47 @@ def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_
     batch_size = gts.size(0) # number of annotations for one image
     mask = torch.zeros(batch_size, anchors.size(0))
     ious = torch.zeros(batch_size, anchors.size(0))
-    
+
+    anchors_bbox = torch.zeros(anchors.size(), dtype=anchors.dtype, device=anchors.device)
+    anchors_bbox[:, 0] = anchors[:, 0] - 0.5 * (anchors[:, 2] - 1)  # como proceder com o lance do -1 ou +1 nesse caso ? na conversão dos bbox2offset e vice versa ?
+    anchors_bbox[:, 1] = anchors[:, 1] - 0.5 * (anchors[:, 3] - 1)  # cuidadooooooooo p anchor eh assim, mas para proposal n .. caso for gerar label para proposal..
+    anchors_bbox[:, 2] = anchors_bbox[:, 0] + anchors[:, 2] - 1.0
+    anchors_bbox[:, 3] = anchors_bbox[:, 1] + anchors[:, 3] - 1.0
+
+    anchors_bbox_area = anchors[:, 2] * anchors[:, 3]
+    gt_area = gts[:, 2] * gts[:, 3]
+
+    # # this snippet shows that the for loop can be vectorized.. just think a little more to vectorize the rest
+    # # but, optimization is the final step!
+    # ## INI - not included.. just testing.. 
+    # print(anchors_bbox.size(), gts.size())
+    # gts[:, 0] + gts[:, 2] - 1.0
+    # all_max = torch.max(anchors_bbox, gts.unsqueeze(1))
+    # print(all_max.size())
+
+    # print(gts[:, 0].unsqueeze(1).size())
+    # x0_max = torch.max(anchors_bbox[:, 0], gts[:, 0].unsqueeze(1))
+    # print(x0_max.size())
+
+    # # this below was inside the for
+    # print(torch.equal(x0, x0_max[bi, :]))
+    # print(torch.equal(x0, all_max[bi, :, 0]))
+    # print(torch.equal(y0, all_max[bi, :, 1]))
+    # ## END - not included.. just testing.. 
+
     for bi in range(batch_size): # maybe I can vectorize this?
-
-        anchors_bbox = torch.zeros(anchors.size(), dtype=anchors.dtype, device=anchors.device)
-        anchors_bbox[:, 0] = anchors[:, 0] - 0.5 * (anchors[:, 2] - 1)  # como proceder com o lance do -1 ou +1 nesse caso ? na conversão dos bbox2offset e vice versa ?
-        anchors_bbox[:, 1] = anchors[:, 1] - 0.5 * (anchors[:, 3] - 1)  # cuidadooooooooo p anchor eh assim, mas para proposal n .. caso for gerar label para proposal..
-        anchors_bbox[:, 2] = anchors_bbox[:, 0] + anchors[:, 2] - 1
-        anchors_bbox[:, 3] = anchors_bbox[:, 1] + anchors[:, 3] - 1
-
-        anchors_bbox_area = anchors[:, 2] * anchors[:, 3]
-
-        gt_area = gts[bi, 2] * gts[bi, 3]
 
         x0 = torch.max(anchors_bbox[:, 0], gts[bi, 0])
         y0 = torch.max(anchors_bbox[:, 1], gts[bi, 1])
-        x1 = torch.min(anchors_bbox[:, 2], gts[bi, 0] + gts[bi, 2] - 1)
-        y1 = torch.min(anchors_bbox[:, 3], gts[bi, 1] + gts[bi, 3] - 1)
+        x1 = torch.min(anchors_bbox[:, 2], gts[bi, 0] + gts[bi, 2] - 1.0)
+        y1 = torch.min(anchors_bbox[:, 3], gts[bi, 1] + gts[bi, 3] - 1.0)
 
-        intersection = torch.clamp(x1 - x0 + 1, min=0) * torch.clamp(y1 - y0 + 1, min=0)
+        intersection = torch.clamp(x1 - x0 + 1.0, min=0.0) * torch.clamp(y1 - y0 + 1.0, min=0.0)
 
-        union = anchors_bbox_area + gt_area - intersection
+        union = anchors_bbox_area + gt_area[bi] - intersection
         iou = intersection / union
 
         ious[bi, :] = iou
-
 
     # Set negative anchors
     # This should be first because the next instructions can override the mask
@@ -130,12 +147,12 @@ def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0
     ious = torch.zeros(batch_size, filtered_proposals.size(1))
 
     filtered_bbox = offset2bbox(filtered_proposals)
+
+    proposals_bbox_area = filtered_proposals[0, :, 2] * filtered_proposals[0, :, 3]
     
-    for bi in range(batch_size): # maybe I can vectorize this?
+    gt_area = gts[:, 2] * gts[:, 3]
 
-        proposals_bbox_area = filtered_proposals[0, :, 2] * filtered_proposals[0, :, 3]
-
-        gt_area = gts[bi, 2] * gts[bi, 3]
+    for bi in range(batch_size): # maybe I can vectorize this?  
 
         x0 = torch.max(filtered_bbox[0, :, 0], gts[bi, 0])
         y0 = torch.max(filtered_bbox[0, :, 1], gts[bi, 1])
@@ -144,11 +161,11 @@ def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0
 
         intersection = torch.clamp(x1 - x0 + 1, min=0) * torch.clamp(y1 - y0 + 1, min=0)
 
-        union = proposals_bbox_area + gt_area - intersection
+        union = proposals_bbox_area + gt_area[bi] - intersection
         iou = intersection / union
 
         ious[bi, :] = iou
-
+        
 
     # Set easy background cases as don't care
     idxs = ious < low_threshold

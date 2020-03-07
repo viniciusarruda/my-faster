@@ -228,6 +228,8 @@ class RPN(nn.Module):
             a2 = aw + a0 - 1
             a3 = ah + a1 - 1
 
+            # TODO
+            # I read somewhere that I should eliminate only the anchors in which its center is outside the image, if so, clip the anchors at the boarder?
             if a0 >= 0 and a1 >= 0 and a2 <= self.input_img_size[1] - 1 and a3 <= self.input_img_size[0] - 1:
                 valid_mask[i] = 1
 

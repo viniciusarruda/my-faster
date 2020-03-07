@@ -32,14 +32,17 @@
         -> In fact, it behaves slightly different when handling degenerate boxes,
            but nothing that gets in the way of performance.
 - [x] Use the built-in NMS (do not delete the old, just comment or something similar)
-- [ ] Check these (from https://github.com/aleju/papers/blob/master/neural-nets/Faster_R-CNN.md):
+- [x] Check these (from https://github.com/aleju/papers/blob/master/neural-nets/Faster_R-CNN.md):
     - [x] Positive examples are anchor boxes that have an IoU with a ground truth bounding box of 0.7 or more. If no anchor  point has such an IoU with a specific box, the one with the highest IoU is used instead.
     - [x] They use 128 positive examples and 128 negative ones. If they can't come up with 128 positive examples, they add more negative ones.
     - [x] Look the test topic and also check if I am doing right
     - [x] Balance the training also for the regressor.
+- [ ] Remove the batch loop, since it is only one image (to add more images in the batch later, but I think I wont)
+    - [ ] To later optimize and clean, this is important!
+    >>> make copy of all the code.. and do it step by step.. taking care to not break the code!
+    >>> current output has to be the same after the modification!!!
 - [ ] Clean/comment/review loss.py file (check to remove duplicata as calculating the iou)
 - [ ] Document as in https://realpython.com/documenting-python-code/
-- [ ] Remove the batch loop, since it is only one image (to add more images in the batch later, but I think I wont)
 - [ ] Improve the visualization including verbose information for debugging (Tensorboard)
     - [ ] Include a heatmap visualization of the features right before the RPN (maybe an insight to use attention here)
 - [ ] Check about the pattern of bbox. I really need to consider bbox as pixels position or continuous ? 

@@ -89,6 +89,8 @@ class MyDataset(Dataset):
             # TODO -> To Check!
             # The table_gts_positive_anchors is not consistent with the labels.
             # Should be consistent? Or this balancing is just for the cross-entropy loss?
+            # [07/03/2020] - I think it is correct, the balancing is just for classification loss, as we have two labels.
+            # [07/03/2020]   For the regression, we have no labels, just regressing the positive ones, so, making no sense to balance them.
 
         ### Fill the remaining batch with negative anchors
         negative_anchors_idxs = (balanced_labels == 0).nonzero().squeeze()

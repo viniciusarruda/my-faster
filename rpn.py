@@ -37,6 +37,7 @@ class RPN(nn.Module):
 
 
     def forward(self, x):
+        assert x.size(0) == 1 # remove this assertion later..
         # x -> (batch_size, feature_extractor_out_dim, 64, 64)
         
         x = F.relu(self.conv_rpn(x))
@@ -48,9 +49,21 @@ class RPN(nn.Module):
         # cls_out -> (batch_size, k * 2, 64, 64)
         # para cada ancora, prob de obj e ~obj
 
-        batch_size, _, _, _ = cls_out.size()
-        cls_out = cls_out.permute(0, 2, 3, 1).reshape((batch_size, -1, 2))
+        # print(cls_out.size())
+        # print(cls_out.stride())
+        # print(cls_out.is_contiguous())
+        # print(cls_out.numel())
+        # print()
+
+        # Changed the above lines to the next ones
+        # cls_out = cls_out.permute(0, 2, 3, 1).reshape((batch_size, -1, 2))
         # cls_out -> (batch_size, 64 * 64 * k, 2)
+        
+        cls_out = cls_out[0, :, :, :]
+        # cls_out = cls_out.permute(1, 2, 0).reshape((-1, 2))
+        # The below is the same as above, but explicit
+        cls_out = cls_out.permute(1, 2, 0).contiguous().view(-1, 2)
+        # cls_out -> (64 * 64 * k, 2)
         ###############################################
 
         ### Compute the object proposals ###
@@ -58,20 +71,25 @@ class RPN(nn.Module):
         reg_out = self.reg_layer(x)
         # reg_out -> (batch_size, k * 4, 64, 64)
 
-        reg_out = reg_out.permute(0, 2, 3, 1).reshape(batch_size, -1, 4) # acredito que n precise do permute, talvez tirando fique mais rapido pois esse reshape esta mudando o tensor pois n eh contiguo - idem para o clss_out
+        # Changed the above lines to the next ones
+        # reg_out = reg_out.permute(0, 2, 3, 1).reshape(batch_size, -1, 4) 
         # reg_out -> (batch_size, 64 * 64 * k, 4)
 
-        proposals, cls_out = self._anchors2proposals(reg_out, cls_out)
-        # proposals -> (batch_size, k * 4, 64, 64)
+        reg_out = reg_out[0, :, :, :]
+        reg_out = reg_out.permute(1, 2, 0).contiguous().view(-1, 4) 
+        # reg_out -> (64 * 64 * k, 4)
 
+        proposals, cls_out = self._anchors2proposals(reg_out, cls_out)
+        # proposals -> (#valid_anchors, 4)
+        # cls_out   -> (#valid_anchors, 2)
         ####################################
 
         ####################################
 
         bboxes = offset2bbox(proposals)
         bboxes = clip_boxes(bboxes, self.input_img_size)
-        
-        probs_object = F.softmax(cls_out, dim=2)[:, :, 1] # it is 1 and not zero ! 
+
+        probs_object = F.softmax(cls_out, dim=1)[:, 1] # it is 1 and not zero ! (TODO check this)
         # probs_object -> (batch_size, 64 * 64 * k)
         
         # parece que o codigo original n filtra no treino.. so no teste..
@@ -104,25 +122,25 @@ class RPN(nn.Module):
 
         """
 
-        cls_out = cls_out[:, self.valid_anchors, :]
+        cls_out = cls_out[self.valid_anchors, :]
 
         ax = self.anchors_parameters[self.valid_anchors, 0]
         ay = self.anchors_parameters[self.valid_anchors, 1]
         aw = self.anchors_parameters[self.valid_anchors, 2]
         ah = self.anchors_parameters[self.valid_anchors, 3]
 
-        tx = reg_out[:, self.valid_anchors, 0]
-        ty = reg_out[:, self.valid_anchors, 1]
-        tw = reg_out[:, self.valid_anchors, 2]
-        th = reg_out[:, self.valid_anchors, 3]
+        tx = reg_out[self.valid_anchors, 0]
+        ty = reg_out[self.valid_anchors, 1]
+        tw = reg_out[self.valid_anchors, 2]
+        th = reg_out[self.valid_anchors, 3]
 
         px = ax + aw * tx
         py = ay + ah * ty
         pw = aw * torch.exp(tw)
         ph = ah * torch.exp(th)
 
-        proposals = torch.stack((px, py, pw, ph), dim=2).to(reg_out.device) # esse negocio de toda hora jogar pra device ta ruim.. 
-        
+        proposals = torch.stack((px, py, pw, ph), dim=1)
+
         return proposals, cls_out
 
 

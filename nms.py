@@ -5,13 +5,8 @@ import config
 # TODO: check if I need to check if x0 is greater than x1 e etc.. (the assertion)
 # TODO: keep the +1 standard or no? https://github.com/facebookresearch/Detectron/blob/master/detectron/utils/boxes.py#L23
 
-
+# accepts only bboxes.size() -> (#bboxes, 4) and probs_object.size() -> (#bboxes)
 def nms(bboxes, probs_object):
-
-    assert bboxes.size(0) == 1
-    bi = 0
-    bboxes = bboxes[bi, :, :]
-    probs_object = probs_object[bi, :]
 
     # TODO I think I will leave this here.. 
     # I want to check degenerate cases. 
@@ -56,7 +51,7 @@ def nms(bboxes, probs_object):
         probs_object = probs_object[:n_bboxes]
 
 
-    return bboxes.unsqueeze(0), probs_object.unsqueeze(0) # unsqueeze for simulating a batch of 1   
+    return bboxes, probs_object
 
 
 # @profile # uncomment and run kernprof -lv nms.py on terminal

@@ -51,14 +51,14 @@ import matplotlib.pyplot as plt
 def see_rpn_results(img_np, table_gts_positive_anchors, proposals_np, probs_object_np, annotation_np, anchors_np, valid_anchors_np, e):
 
     bboxes_np = _offset2bbox(proposals_np)
-    annotation_np = _offset2bboxann(annotation_np)
+    annotation_np = _offset2bbox(annotation_np)
     anchors_np = anchors_np[valid_anchors_np == 1, :]
 
     img_np *= 255
     real = Image.fromarray(img_np.astype(np.uint8))
 
     real_draw = ImageDraw.Draw(real)
-    zero = 0
+
     for b in range(annotation_np.shape[0]):
 
         real_draw.rectangle([annotation_np[b, 0], annotation_np[b, 1], annotation_np[b, 2], annotation_np[b, 3]], outline='green')
@@ -81,12 +81,12 @@ def see_rpn_results(img_np, table_gts_positive_anchors, proposals_np, probs_obje
             a3 = ah + a1 - 1
 
             real_draw.rectangle([a0, a1, a2, a3], outline='magenta')                    
-            real_draw.rectangle([bboxes_np[zero, anchor_idx, 0], bboxes_np[zero, anchor_idx, 1], bboxes_np[zero, anchor_idx, 2], bboxes_np[zero, anchor_idx, 3]], outline='red')                    
+            real_draw.rectangle([bboxes_np[anchor_idx, 0], bboxes_np[anchor_idx, 1], bboxes_np[anchor_idx, 2], bboxes_np[anchor_idx, 3]], outline='red')                    
 
             print('Anchors as bbox: ', a0, a1, a2, a3)               
-            print('Proposals as bbox: ', bboxes_np[zero, anchor_idx, 0], bboxes_np[zero, anchor_idx, 1], bboxes_np[zero, anchor_idx, 2], bboxes_np[zero, anchor_idx, 3])
-            print('Proposals: ', proposals_np[zero, anchor_idx, 0], proposals_np[zero, anchor_idx, 1], proposals_np[zero, anchor_idx, 2], proposals_np[zero, anchor_idx, 3])
-            print('Prob (not obj, obj): ', probs_object_np[zero, anchor_idx, 0], probs_object_np[zero, anchor_idx, 1])
+            print('Proposals as bbox: ', bboxes_np[anchor_idx, 0], bboxes_np[anchor_idx, 1], bboxes_np[anchor_idx, 2], bboxes_np[anchor_idx, 3])
+            print('Proposals: ', proposals_np[anchor_idx, 0], proposals_np[anchor_idx, 1], proposals_np[anchor_idx, 2], proposals_np[anchor_idx, 3])
+            print('Prob (not obj, obj): ', probs_object_np[anchor_idx, 0], probs_object_np[anchor_idx, 1])
             print()
         
 
@@ -97,25 +97,25 @@ def see_rpn_results(img_np, table_gts_positive_anchors, proposals_np, probs_obje
 def see_rpn_final_results(img_np, proposals_np, probs_object_np, annotation_np, e):
 
     bboxes_np = _offset2bbox(proposals_np)
-    annotation_np = _offset2bboxann(annotation_np)
+    annotation_np = _offset2bbox(annotation_np)
 
     img_np *= 255
     real = Image.fromarray(img_np.astype(np.uint8))
 
     real_draw = ImageDraw.Draw(real)
-    zero = 0
+
     for b in range(annotation_np.shape[0]):
         
         real_draw.rectangle([annotation_np[b, 0], annotation_np[b, 1], annotation_np[b, 2], annotation_np[b, 3]], outline='green')
         print('Annotation as bbox: ', annotation_np[b, 0], annotation_np[b, 1], annotation_np[b, 2], annotation_np[b, 3])
 
-        for a in range(probs_object_np.shape[1]):
+        for a in range(probs_object_np.shape[0]):
                 
-            real_draw.rectangle([bboxes_np[zero, a, 0], bboxes_np[zero, a, 1], bboxes_np[zero, a, 2], bboxes_np[zero, a, 3]], outline='red')                    
+            real_draw.rectangle([bboxes_np[a, 0], bboxes_np[a, 1], bboxes_np[a, 2], bboxes_np[a, 3]], outline='red')                    
 
-            print('Proposals as bbox: ', bboxes_np[zero, a, 0], bboxes_np[zero, a, 1], bboxes_np[zero, a, 2], bboxes_np[zero, a, 3])
-            print('Proposals: ', proposals_np[zero, a, 0], proposals_np[zero, a, 1], proposals_np[zero, a, 2], proposals_np[zero, a, 3])
-            print('Prob: ', probs_object_np[zero, a])            
+            print('Proposals as bbox: ', bboxes_np[a, 0], bboxes_np[a, 1], bboxes_np[a, 2], bboxes_np[a, 3])
+            print('Proposals: ', proposals_np[a, 0], proposals_np[a, 1], proposals_np[a, 2], proposals_np[a, 3])
+            print('Prob: ', probs_object_np[a])            
             print()
 
     # real.show()
@@ -124,24 +124,24 @@ def see_rpn_final_results(img_np, proposals_np, probs_object_np, annotation_np, 
 
 def see_final_results(img_np, clss_score_np, refined_proposals_np, annotation_np, e):
 
-    annotation_np = _offset2bboxann(annotation_np)
     bboxes_np = _offset2bbox(refined_proposals_np)
+    annotation_np = _offset2bbox(annotation_np)
 
     img_np *= 255
     real = Image.fromarray(img_np.astype(np.uint8))
 
     real_draw = ImageDraw.Draw(real)
-    zero = 0
+
     for b in range(annotation_np.shape[0]):
 
         real_draw.rectangle([annotation_np[b, 0], annotation_np[b, 1], annotation_np[b, 2], annotation_np[b, 3]], outline='green')                    
         print('Annotation as bbox: ', annotation_np[b, 0], annotation_np[b, 1], annotation_np[b, 2], annotation_np[b, 3])               
 
-        for a in range(clss_score_np.shape[1]):
+        for a in range(clss_score_np.shape[0]):
         
-            real_draw.rectangle([bboxes_np[zero, a, 0], bboxes_np[zero, a, 1], bboxes_np[zero, a, 2], bboxes_np[zero, a, 3]], outline='red')                    
-            print('Bboxes: ', bboxes_np[zero, a, 0], bboxes_np[zero, a, 1], bboxes_np[zero, a, 2], bboxes_np[zero, a, 3])
-            print('Clss score: ', clss_score_np[zero, a])
+            real_draw.rectangle([bboxes_np[a, 0], bboxes_np[a, 1], bboxes_np[a, 2], bboxes_np[a, 3]], outline='red')                    
+            print('Bboxes: ', bboxes_np[a, 0], bboxes_np[a, 1], bboxes_np[a, 2], bboxes_np[a, 3])
+            print('Clss score: ', clss_score_np[a])
             print()
 
     # real.show()
@@ -279,26 +279,12 @@ def show_masked_anchors(e, anchors_np, valid_anchors_np, mask_np, table_gts_posi
 
 def _offset2bbox(proposals):
     """
-    proposals: batch_size, -1, 4
-    bboxes: batch_size, -1, 4
+    proposals: #proposals, 4
+    bboxes: #bboxes, 4
 
     """
-
-    bx0 = proposals[:, :, 0]
-    by0 = proposals[:, :, 1]
-    bx1 = bx0 + proposals[:, :, 2] - 1
-    by1 = by0 + proposals[:, :, 3] - 1
-
-    bboxes = np.stack((bx0, by0, bx1, by1), axis=2)
-
-    return bboxes
-
-def _offset2bboxann(proposals):
-    """
-    proposals: batch_size, -1, 4
-    bboxes: batch_size, -1, 4
-
-    """
+    # TODO remove this assertion
+    assert len(proposals.shape) == 2
 
     bx0 = proposals[:, 0]
     by0 = proposals[:, 1]
@@ -308,7 +294,6 @@ def _offset2bboxann(proposals):
     bboxes = np.stack((bx0, by0, bx1, by1), axis=1)
 
     return bboxes
-
 
 class LossViz:
     

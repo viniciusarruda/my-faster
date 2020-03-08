@@ -109,7 +109,7 @@ class MyDataset(Dataset):
         # I think the excess is also marked as dont care too (didn't confirm - didn't find anything about it)
         balanced_labels[idxs_to_suppress] = -1 # mark them as don't care
 
-        # You can see the difference before/after balancing the labels:
+        # # You can see the difference before/after balancing the labels:
         # print('---------')
         # print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
         # print((balanced_labels == -1).sum(), (balanced_labels == 0).sum(), (balanced_labels == 1).sum())
@@ -195,6 +195,7 @@ def _format_data(data, anchors_parameters, valid_anchors):
             
             bboxes = new_bboxes
             # doing again to get the correct bboxes indexes.. 
+            # TODO understand why I did this
             labels, table_gts_positive_anchors = anchor_labels(anchors_parameters, valid_anchors, bboxes)
 
         new_data.append((filename, bboxes, labels, table_gts_positive_anchors))

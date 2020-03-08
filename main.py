@@ -81,28 +81,36 @@ def main():
         
         for img, annotation, labels, table_gts_positive_anchors in dataloader:
 
-            # it is just one image, however, for the image should keep the batch channel
+            # img.size()                        -> torch.Size([1, 3, input_img_size[0], input_img_size[1]])
+            # annotation.size()                 -> torch.Size([1, #bboxes_in_img, 4])
+            # labels.size()                     -> torch.Size([1, #valid_anchors])
+            #                                      -1, 0 and 1 for dont care, negative and positive, respectively
+            # table_gts_positive_anchors.size() -> torch.Size([1, #positive_anchors, 2]) 
+            #                                      [idx of gt box, idxs of its assigned anchor on labels]
+
+            # This implemention only supports one image per batch
+            # Every batch channel is removed except for the image which will be forwarded through the feature extractor
+            assert img.size(0) == annotation.size(0) == labels.size(0) == table_gts_positive_anchors.size(0) == 1
             img, annotation = img.to(device), annotation[0, :, :].to(device)
             labels, table_gts_positive_anchors = labels[0, :].to(device), table_gts_positive_anchors[0, :, :].to(device)
+            # img.size()                        -> torch.Size([1, 3, input_img_size[0], input_img_size[1]])
+            # annotation.size()                 -> torch.Size([#bboxes_in_img, 4])
+            # labels.size()                     -> torch.Size([#valid_anchors])
+            # table_gts_positive_anchors.size() -> torch.Size([#positive_anchors, 2]) 
 
             optimizer.zero_grad()
 
-            # print('Image size: {}'.format(img.size()))
-            # print('Annotation size: {}'.format(annotation.size()))
             features = fe_net.forward(img)
+            # features.size() -> torch.Size([1, fe.out_dim, fe.feature_extractor_size, fe.feature_extractor_size])
 
-            # print('Features size: {}'.format(features.size()))
+            # The RPN handles the batch channel. The input (features) has the batch channel (asserted to be 1)
+            # and outputs all the objects already handled
             proposals, cls_out, filtered_proposals, probs_object = rpn_net.forward(features)
-
-            # print('Proposals size: {}'.format(proposals.size()))
-            # print('Probabilities object size: {}'.format(probs_object.size()))
-
-            #####
-            # TODO:
-            # remove here the batch channel for the above tensors
-            # adapt the functions below
-            #####
-
+            # proposals.size()          -> torch.Size([#valid_anchors, 4])
+            # cls_out.size()            -> torch.Size([#valid_anchors, 2])
+            # filtered_proposals.size() -> torch.Size([#filtered_proposals, 4])
+            # probs_object.size()       -> torch.Size([#filtered_proposals]) #NOTE just for visualization.. temporary
+            # The features object has its batch channel kept due to later use
 
             ## Compute RPN loss ##
             rpn_bbox_loss = get_target_distance(proposals, rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation, table_gts_positive_anchors)
@@ -115,16 +123,15 @@ def main():
             rpn_bbox_loss_epoch += rpn_bbox_loss.item()
             rpn_loss_epoch += rpn_loss.item()
 
-
-            # assert filtered_proposals.size(1) > 0
-            if filtered_proposals.size(1) > 0:
+            # if there is any proposal which is classified as an object
+            if filtered_proposals.size(0) > 0: 
 
                 rois = roi_net.forward(filtered_proposals, features)
-                # print('Roi size: {}'.format(rois.size()))
-                #
+                # rois.size()      -> torch.Size([#filtered_proposals, fe.out_dim, roi_net.out_dim, roi_net.out_dim])
+
                 raw_reg, raw_cls = clss_reg.forward(rois)
-                # print('raw_reg size: {}'.format(raw_reg.size()))
-                # print('raw_cls size: {}'.format(raw_cls.size()))
+                # raw_reg.size()   -> torch.Size([#filtered_proposals, 4])
+                # raw_cls.size()   -> torch.Size([#filtered_proposals, 2])
 
                 #####
                 ## Compute class_reg loss ##
@@ -167,28 +174,26 @@ def main():
             for net in [fe_net, rpn_net, roi_net, clss_reg]: net.eval()
             with torch.no_grad():
 
-                for i in range(proposals.size()[0]):
-                    see_rpn_results(inv_normalize(img[i, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),
-                                    table_gts_positive_anchors.detach().numpy().copy(), 
-                                    proposals.detach().numpy().copy(), 
-                                    F.softmax(cls_out, dim=2).detach().numpy().copy(),
-                                    annotation.detach().numpy().copy(),
-                                    rpn_net.anchors_parameters.detach().numpy().copy(),
-                                    rpn_net.valid_anchors.detach().numpy().copy(), e)
+                see_rpn_results(inv_normalize(img[0, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),
+                                table_gts_positive_anchors.detach().numpy().copy(), 
+                                proposals.detach().numpy().copy(), 
+                                F.softmax(cls_out, dim=1).detach().numpy().copy(),
+                                annotation.detach().numpy().copy(),
+                                rpn_net.anchors_parameters.detach().numpy().copy(),
+                                rpn_net.valid_anchors.detach().numpy().copy(), e)
+                
                 if show_all_results:
-                    for i in range(proposals.size()[0]):
-                        see_rpn_final_results(inv_normalize(img[i, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),
-                                        filtered_proposals.detach().numpy().copy(), 
-                                        probs_object.detach().numpy().copy(), 
-                                        annotation.detach().numpy().copy(),
-                                        e)
+                    see_rpn_final_results(inv_normalize(img[0, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),
+                                    filtered_proposals.detach().numpy().copy(), 
+                                    probs_object.detach().numpy().copy(), 
+                                    annotation.detach().numpy().copy(),
+                                    e)
 
-                    for i in range(refined_proposals.size()[0]):
-                        see_final_results(inv_normalize(img[i, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),
-                                        clss_score.detach().numpy().copy(), 
-                                        refined_proposals.detach().numpy().copy(), 
-                                        annotation.detach().numpy().copy(),
-                                        e)
+                    see_final_results(inv_normalize(img[0, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),
+                                    clss_score.detach().numpy().copy(), 
+                                    refined_proposals.detach().numpy().copy(), 
+                                    annotation.detach().numpy().copy(),
+                                    e)
             for net in [fe_net, rpn_net, roi_net, clss_reg]: net.train()
     
     lv.save()

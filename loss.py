@@ -135,29 +135,27 @@ def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_
 
 
 
-# taking in consideration what that man said (about getting computing power is better), is better to find a way to get rid of
+# taking in consideration what Rich Sutton said (about getting computing power is better), is better to find a way to get rid of
 # this expensive steps instead of trying to research other methods of doing object detection
 def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0.5):
     # tem como simplificar e otimizar..
 
-    assert filtered_proposals.size(0) == 1 # implemented for batch size 1
-
     batch_size = gts.size(0)
-    cls_mask = torch.zeros(batch_size, filtered_proposals.size(1))
-    ious = torch.zeros(batch_size, filtered_proposals.size(1))
+    cls_mask = torch.zeros(batch_size, filtered_proposals.size(0))
+    ious = torch.zeros(batch_size, filtered_proposals.size(0))
 
     filtered_bbox = offset2bbox(filtered_proposals)
 
-    proposals_bbox_area = filtered_proposals[0, :, 2] * filtered_proposals[0, :, 3]
+    proposals_bbox_area = filtered_proposals[:, 2] * filtered_proposals[:, 3]
     
     gt_area = gts[:, 2] * gts[:, 3]
 
     for bi in range(batch_size): # maybe I can vectorize this?  
 
-        x0 = torch.max(filtered_bbox[0, :, 0], gts[bi, 0])
-        y0 = torch.max(filtered_bbox[0, :, 1], gts[bi, 1])
-        x1 = torch.min(filtered_bbox[0, :, 2], gts[bi, 0] + gts[bi, 2] - 1)
-        y1 = torch.min(filtered_bbox[0, :, 3], gts[bi, 1] + gts[bi, 3] - 1)
+        x0 = torch.max(filtered_bbox[:, 0], gts[bi, 0])
+        y0 = torch.max(filtered_bbox[:, 1], gts[bi, 1])
+        x1 = torch.min(filtered_bbox[:, 2], gts[bi, 0] + gts[bi, 2] - 1)
+        y1 = torch.min(filtered_bbox[:, 3], gts[bi, 1] + gts[bi, 3] - 1)
 
         intersection = torch.clamp(x1 - x0 + 1, min=0) * torch.clamp(y1 - y0 + 1, min=0)
 
@@ -179,7 +177,7 @@ def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0
     # It is possible that a certain proposal is positive assigned to more than one box.
     # So to handle this issue, this snippet makes the proposal belong only to the box with maximum IoU.
     idxs_cond = torch.argmax(ious, dim=0)
-    cond = torch.zeros(batch_size, filtered_proposals.size(1), dtype=torch.bool)
+    cond = torch.zeros(batch_size, filtered_proposals.size(0), dtype=torch.bool)
     cond[idxs_cond, range(idxs_cond.size(0))] = True
     idxs = idxs & cond    
 
@@ -256,14 +254,12 @@ def parametrize_bbox(bbox, a_bbox):
     th = torch.log(h / ha)
     return tx, ty, tw, th
 
-
+# TODO
+# check this.. really need the table_gts_positive_anchors ?
+# comment inserting the expected input and the output and its meaning (document phase)
 def get_target_distance(proposals, anchors, valid_anchors, gts, table_gts_positive_anchors):
 
     anchors = anchors[valid_anchors, :]
-
-    assert proposals.size(0) == 1 # implemented for batch size 1
-
-    proposals = proposals[0, :, :] # batch size is 1 (just one image!)
 
     sum_reg = 0
 
@@ -283,15 +279,8 @@ def get_target_distance(proposals, anchors, valid_anchors, gts, table_gts_positi
     # without normalization to simplify as said in the paper
     return sum_reg # / d
 
-
+# Jesus, need to comment this.. I didnt understand nothing!
 def get_target_distance2(raw_reg, rpn_filtered_proposals, gts, table_fgs_positive_proposals):
-
-    assert raw_reg.size(0) == 1 and rpn_filtered_proposals.size(0) == 1 # implemented for batch size 1
-
-    raw_reg = raw_reg[0, :, :] # batch size is 1 (just one image!)
-    rpn_filtered_proposals = rpn_filtered_proposals[0, :, :] # batch size is 1 (just one image!)
-    
-    sum_reg = 0
 
     # txgt, tygt, twgt, thgt = parametrize_bbox(gts[bi, :].reshape(1, -1), rpn_filtered_proposals[bi, idxs[0, :], :])
     txgt, tygt, twgt, thgt = parametrize_bbox(gts[table_fgs_positive_proposals[:, 0], :], rpn_filtered_proposals[table_fgs_positive_proposals[:, 1], :])
@@ -301,19 +290,16 @@ def get_target_distance2(raw_reg, rpn_filtered_proposals, gts, table_fgs_positiv
 
     assert txp.size() == txgt.size()
 
-    sum_reg += smooth_l1(txp - txgt, sigma=3)
-    sum_reg += smooth_l1(typ - tygt, sigma=3)
-    sum_reg += smooth_l1(twp - twgt, sigma=3)
-    sum_reg += smooth_l1(thp - thgt, sigma=3)
+    sum_reg = smooth_l1(txp - txgt, sigma=3) + \
+              smooth_l1(typ - tygt, sigma=3) + \
+              smooth_l1(twp - twgt, sigma=3) + \
+              smooth_l1(thp - thgt, sigma=3)
 
     # without normalization to simplify as said in the paper
     return sum_reg # / d
 
 
 def compute_rpn_prob_loss(probs_object, labels):
-
-    assert probs_object.size(0) == 1 # implemented for batch size 1
-    probs_object = probs_object[0, :, :] # make this filtration when producethis tensor.. to do not spread out stuff around the code
 
     idxs = labels != -1.0  # considering all cares ! Just positive and negative samples !
 
@@ -326,9 +312,6 @@ def compute_rpn_prob_loss(probs_object, labels):
 
 
 def compute_cls_reg_prob_loss(probs_object, labels):
-
-    assert probs_object.size(0) == 1 # implemented for batch size 1
-    probs_object = probs_object[0, :, :] # make this filtration when producethis tensor.. to do not spread out stuff around the code
 
     idxs = labels != -1.0  # considering all cares ! Just backgrounds and cars samples !
     

@@ -26,11 +26,9 @@ class ROI(nn.Module):
         # proposals[:, :, 2] *= fx
         # proposals[:, :, 3] *= fy
 
-        rois = torchvision.ops.roi_align(features, [proposals[0, :, :]], (14, 14), spatial_scale=fx)
+        rois = torchvision.ops.roi_align(features, [proposals], (14, 14), spatial_scale=fx)
 
         rois = F.max_pool2d(rois, kernel_size=2)
-
-        rois = rois.unsqueeze(0)
 
         return rois
 

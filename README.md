@@ -37,10 +37,14 @@
     - [x] They use 128 positive examples and 128 negative ones. If they can't come up with 128 positive examples, they add more negative ones.
     - [x] Look the test topic and also check if I am doing right
     - [x] Balance the training also for the regressor.
-- [ ] Remove the batch loop, since it is only one image (to add more images in the batch later, but I think I wont)
-    - [ ] To later optimize and clean, this is important!
-    >>> make copy of all the code.. and do it step by step.. taking care to not break the code!
-    >>> current output has to be the same after the modification!!!
+- [x] Remove the batch loop, since it is only one image (to add more images in the batch later, but I think I wont)
+    - [x] remove batch channel of bbox_utils.py 
+    - [x] remove batch channel of _anchors2proposals() function
+    - [x] check if output is the same before and after the modification
+- [ ] Fix valid anchors
+    - [ ] Consider its center not the whole region
+    - [ ] Do I need to keep all anchors or only the valid ones through the code?
+- [ ] Enable images with aspect ration different than 1 (and fix the comments accordingly)
 - [ ] Clean/comment/review loss.py file (check to remove duplicata as calculating the iou)
 - [ ] Document as in https://realpython.com/documenting-python-code/
 - [ ] Improve the visualization including verbose information for debugging (Tensorboard)

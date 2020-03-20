@@ -171,6 +171,7 @@ class RPN(nn.Module):
 
         for r in self.anchor_ratios:
             
+            # An issue about this round: https://github.com/facebookresearch/Detectron/issues/227
             anchor_n_cols = np.round(np.sqrt(base_anchor_area / r))
             anchor_n_rows = np.round(anchor_n_cols * r)
 
@@ -184,6 +185,7 @@ class RPN(nn.Module):
             anchor_row_1 = base_anchor_center_rows + anchor_n_rows_mid
 
             anchors.append([anchor_col_0, anchor_row_0, anchor_col_1, anchor_row_1])
+
 
         final_anchors = []
 
@@ -246,9 +248,11 @@ class RPN(nn.Module):
             a2 = aw + a0 - 1
             a3 = ah + a1 - 1
 
-            # TODO
-            # I read somewhere that I should eliminate only the anchors in which its center is outside the image, if so, clip the anchors at the boarder?
-            if a0 >= 0 and a1 >= 0 and a2 <= self.input_img_size[1] - 1 and a3 <= self.input_img_size[0] - 1:
+            # This was the implemented by me:
+            # if a0 >= 0 and a1 >= 0 and a2 <= self.input_img_size[1] - 1 and a3 <= self.input_img_size[0] - 1:
+            # I read the original faster code, and it was implemented like this:
+            # It sugests that is not considered the pixel space but a continuous space instead.
+            if a0 >= 0 and a1 >= 0 and a2 < self.input_img_size[1] and a3 < self.input_img_size[0]:
                 valid_mask[i] = 1
 
         valid_mask = torch.from_numpy(valid_mask).to(torch.bool)

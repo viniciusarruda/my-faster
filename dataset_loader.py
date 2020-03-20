@@ -185,8 +185,10 @@ def _format_data(data, anchors_parameters, valid_anchors):
 
         new_bboxes = bboxes[torch.unique(table_gts_positive_anchors[:, 0]), :]
 
-        if bboxes.size(0) != new_bboxes.size(0):
+        assert bboxes.size(0) >= new_bboxes.size(0) # remove this in the final version
 
+        if bboxes.size(0) != new_bboxes.size(0):
+            
             n_removed_bboxes += bboxes.size(0) - new_bboxes.size(0)
 
             if new_bboxes.size(0) == 0:

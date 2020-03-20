@@ -42,7 +42,16 @@
     - [x] remove batch channel of _anchors2proposals() function
     - [x] check if output is the same before and after the modification
 - [ ] Fix valid anchors
-    - [ ] Consider its center not the whole region
+    - [x] Implement visualization of the center of each anchor and valid anchor.
+    - [x] Check if it is correct, the center of each valid anchor is not centralized.. why?
+        - [x] Understand the _get_anchor_parameters() code
+        - [x] Read that issue aboud computing anchor parameters
+        - [x] Show the center of anchors when plotting positive anchors. Also interesting drawing the center of all anchors in a "background" color to see how it would be like. (this last was not done but satisfied)
+        - [x] Understand why the result is not centralized
+    - [future] Consider its center not the whole region (actually compare.. because the original code considers what is current implemented)
+        - [future] Plot the all anchors cliping to the image size
+        These features are attempts to improve the faster. Your goal is to replicate the results.
+        At a later time this will be investigated, but not now.
     - [ ] Do I need to keep all anchors or only the valid ones through the code?
 - [ ] Enable images with aspect ration different than 1 (and fix the comments accordingly)
 - [ ] Clean/comment/review loss.py file (check to remove duplicata as calculating the iou)

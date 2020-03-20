@@ -24,8 +24,8 @@ class RPN(nn.Module):
         self.anchor_ratios = config.rpn_anchor_ratios
         self.anchor_scales = config.rpn_anchor_scales
         self.k = len(self.anchor_scales) * len(self.anchor_ratios)
-        self.anchors_parameters, self.valid_anchors = self._get_anchors_parameters()
-        self.anchors_parameters, self.valid_anchors = self.anchors_parameters.to(device), self.valid_anchors.to(device)
+        self.anchors, self.valid_anchors_mask = self._get_anchors()
+        self.anchors, self.valid_anchors_mask = self.anchors.to(device), self.valid_anchors_mask.to(device)
         #################################
 
         self.out_dim = 24 # why ? ahco que eu escolhi aleatoriamente
@@ -122,17 +122,17 @@ class RPN(nn.Module):
 
         """
 
-        cls_out = cls_out[self.valid_anchors, :]
+        cls_out = cls_out[self.valid_anchors_mask, :]
 
-        ax = self.anchors_parameters[self.valid_anchors, 0]
-        ay = self.anchors_parameters[self.valid_anchors, 1]
-        aw = self.anchors_parameters[self.valid_anchors, 2]
-        ah = self.anchors_parameters[self.valid_anchors, 3]
+        ax = self.anchors[:, 0]
+        ay = self.anchors[:, 1]
+        aw = self.anchors[:, 2]
+        ah = self.anchors[:, 3]
 
-        tx = reg_out[self.valid_anchors, 0]
-        ty = reg_out[self.valid_anchors, 1]
-        tw = reg_out[self.valid_anchors, 2]
-        th = reg_out[self.valid_anchors, 3]
+        tx = reg_out[self.valid_anchors_mask, 0]
+        ty = reg_out[self.valid_anchors_mask, 1]
+        tw = reg_out[self.valid_anchors_mask, 2]
+        th = reg_out[self.valid_anchors_mask, 3]
 
         px = ax + aw * tx
         py = ay + ah * ty
@@ -144,7 +144,7 @@ class RPN(nn.Module):
         return proposals, cls_out
 
 
-    def _get_anchors_parameters(self):
+    def _get_anchors(self):
 
         # print('pay attention with the order w,h or h,w')
         # print('WARNING: implementation differ from source_base 1 and source_base 2 !')
@@ -256,6 +256,10 @@ class RPN(nn.Module):
                 valid_mask[i] = 1
 
         valid_mask = torch.from_numpy(valid_mask).to(torch.bool)
+
+        print('A total of {} anchors.'.format(anchors.size(0)))
+        anchors = anchors[valid_mask, :]
+        print('A total of {} valid anchors.'.format(anchors.size(0)))
 
         return anchors, valid_mask #anchors_center_cols_offset, anchors_center_rows_offset, aw, ah
 

@@ -25,10 +25,8 @@ def smooth_l1(x, sigma=3.0):
 
 # TODO: This function is only called when generating the dataset!?
 #       if so, change the location to other file as is didn't belong here.
-def anchor_labels(anchors, valid_anchors, gts, negative_threshold=0.3, positive_threshold=0.7):
+def anchor_labels(anchors, gts, negative_threshold=0.3, positive_threshold=0.7):
     # tem como simplificar e otimizar..
-    
-    anchors = anchors[valid_anchors, :]
 
     batch_size = gts.size(0) # number of annotations for one image
     mask = torch.zeros(batch_size, anchors.size(0))
@@ -257,9 +255,7 @@ def parametrize_bbox(bbox, a_bbox):
 # TODO
 # check this.. really need the table_gts_positive_anchors ?
 # comment inserting the expected input and the output and its meaning (document phase)
-def get_target_distance(proposals, anchors, valid_anchors, gts, table_gts_positive_anchors):
-
-    anchors = anchors[valid_anchors, :]
+def get_target_distance(proposals, anchors, gts, table_gts_positive_anchors):
 
     sum_reg = 0
 

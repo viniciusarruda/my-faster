@@ -51,16 +51,16 @@ def main():
     roi_net = ROI(input_img_size=config.input_img_size).to(device)
     clss_reg = ClassifierRegressor(input_img_size=config.input_img_size, input_size=7*7*fe_net.out_dim, n_classes=1).to(device)
 
-    dataloader = get_dataloader(rpn_net.anchors_parameters, rpn_net.valid_anchors)
+    dataloader = get_dataloader(rpn_net.anchors)
 
     # visual debug
-    # show_anchors(rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), config.input_img_size)
+    # show_anchors(rpn_net.anchors.detach().numpy().copy(), config.input_img_size)
 
     # for e, (img, annotation, _, _) in enumerate(dataloader):
     #     img, annotation = img.to(device), annotation[0, :, :].to(device)
-    #     labels, table_gts_positive_anchors = anchor_labels(rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation)
+    #     labels, table_gts_positive_anchors = anchor_labels(rpn_net.anchors, annotation)
     #     labels, table_gts_positive_anchors = labels.to(device), table_gts_positive_anchors.to(device)
-    #     show_masked_anchors(e, rpn_net.anchors_parameters.detach().numpy().copy(), rpn_net.valid_anchors.detach().numpy().copy(), labels.detach().numpy().copy(), table_gts_positive_anchors.detach().numpy().copy(), annotation.detach().numpy().copy(), config.input_img_size)
+    #     show_masked_anchors(e, rpn_net.anchors.detach().numpy().copy(), labels.detach().numpy().copy(), table_gts_positive_anchors.detach().numpy().copy(), annotation.detach().numpy().copy(), config.input_img_size)
     # exit()
 
     params = list(fe_net.parameters()) + list(rpn_net.parameters()) + list(roi_net.parameters()) + list(clss_reg.parameters())
@@ -113,7 +113,7 @@ def main():
             # The features object has its batch channel kept due to later use
 
             ## Compute RPN loss ##
-            rpn_bbox_loss = get_target_distance(proposals, rpn_net.anchors_parameters, rpn_net.valid_anchors, annotation, table_gts_positive_anchors)
+            rpn_bbox_loss = get_target_distance(proposals, rpn_net.anchors, annotation, table_gts_positive_anchors)
             rpn_prob_loss = compute_rpn_prob_loss(cls_out, labels)
             #####
 
@@ -179,8 +179,7 @@ def main():
                                 proposals.detach().numpy().copy(), 
                                 F.softmax(cls_out, dim=1).detach().numpy().copy(),
                                 annotation.detach().numpy().copy(),
-                                rpn_net.anchors_parameters.detach().numpy().copy(),
-                                rpn_net.valid_anchors.detach().numpy().copy(), e)
+                                rpn_net.anchors.detach().numpy().copy(), e)
                 
                 if show_all_results:
                     see_rpn_final_results(inv_normalize(img[0, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(),

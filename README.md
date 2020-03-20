@@ -52,7 +52,8 @@
         - [future] Plot the all anchors cliping to the image size
         These features are attempts to improve the faster. Your goal is to replicate the results.
         At a later time this will be investigated, but not now.
-    - [ ] Do I need to keep all anchors or only the valid ones through the code?
+    - [x] Do I need to keep all anchors or only the valid ones through the code? No, I removed.
+        -[future] if removed.. the feature map can be reduced thus reducing computational processing?
 - [ ] Enable images with aspect ration different than 1 (and fix the comments accordingly)
 - [ ] Clean/comment/review loss.py file (check to remove duplicata as calculating the iou)
 - [ ] Document as in https://realpython.com/documenting-python-code/

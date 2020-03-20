@@ -11,7 +11,7 @@ import config
 
 class MyDataset(Dataset):
 
-    def __init__(self, img_dir, csv_file, input_img_size, anchors_parameters, valid_anchors):
+    def __init__(self, img_dir, csv_file, input_img_size, anchors):
         """
         Args:
             csv_file (string): Path to the csv file with annotations.
@@ -39,7 +39,7 @@ class MyDataset(Dataset):
         _inplace_adjust_bbox2offset(data)
         data = _group_by_filename(data)
 
-        data = _format_data(data, anchors_parameters, valid_anchors)
+        data = _format_data(data, anchors)
 
         self.files_annot = data
         self.img_dir = img_dir
@@ -129,9 +129,9 @@ def inv_normalize(t):
     return invTrans(t)
 
 
-def get_dataloader(anchors_parameters, valid_anchors):
+def get_dataloader(anchors):
 
-    dataset = MyDataset(img_dir=config.img_folder, csv_file=config.annotations_file, input_img_size=config.input_img_size, anchors_parameters=anchors_parameters, valid_anchors=valid_anchors)
+    dataset = MyDataset(img_dir=config.img_folder, csv_file=config.annotations_file, input_img_size=config.input_img_size, anchors=anchors)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
     return dataloader
 
@@ -164,7 +164,7 @@ def _group_by_filename(data_list):
     return [(filename, np.stack(bboxes)) for filename, bboxes in data_dict.items()]
 
 
-def _format_data(data, anchors_parameters, valid_anchors):
+def _format_data(data, anchors):
 
     data = [(filename, torch.Tensor(bboxes)) for filename, bboxes in data]
     new_data = []
@@ -181,7 +181,7 @@ def _format_data(data, anchors_parameters, valid_anchors):
         n_imgs += 1
         n_bboxes += bboxes.shape[0]
         bboxes = torch.Tensor(bboxes)
-        labels, table_gts_positive_anchors = anchor_labels(anchors_parameters, valid_anchors, bboxes)
+        labels, table_gts_positive_anchors = anchor_labels(anchors, bboxes)
 
         new_bboxes = bboxes[torch.unique(table_gts_positive_anchors[:, 0]), :]
 
@@ -198,7 +198,7 @@ def _format_data(data, anchors_parameters, valid_anchors):
             bboxes = new_bboxes
             # doing again to get the correct bboxes indexes.. 
             # TODO understand why I did this
-            labels, table_gts_positive_anchors = anchor_labels(anchors_parameters, valid_anchors, bboxes)
+            labels, table_gts_positive_anchors = anchor_labels(anchors, bboxes)
 
         new_data.append((filename, bboxes, labels, table_gts_positive_anchors))
 

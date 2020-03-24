@@ -29,8 +29,8 @@ class FeatureExtractorNetComplete(nn.Module):
     def  __init__(self):
         super(FeatureExtractorNetComplete, self).__init__()
 
-        h, w = config.input_img_size
-        assert h == w
+        w, h = config.input_img_size
+        # assert h == w
 
         full_model = models.resnet18(pretrained=True)
 
@@ -59,8 +59,9 @@ class FeatureExtractorNetComplete(nn.Module):
 
         self.out_dim = 256 # 12
         self.receptive_field_size = 16 #4 # 2 ^ number_of_maxpool_stride_2
-        self.feature_extractor_size = math.ceil(h / self.receptive_field_size) #14 #32
-
+        # self.feature_extractor_size = math.ceil(h / self.receptive_field_size) #14 #32
+        self.feature_extractor_size = (math.ceil(w / self.receptive_field_size), math.ceil(h / self.receptive_field_size)) #14 #32
+        
     # overriding nn.Module.train()
     def train(self, mode=True):
         

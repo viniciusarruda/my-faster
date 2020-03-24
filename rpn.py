@@ -14,9 +14,9 @@ class RPN(nn.Module):
         super(RPN, self).__init__()
 
         ### Information about the feature extractor ###
-        self.feature_extractor_size = feature_extractor_size
+        self.feature_extractor_size = feature_extractor_size # (w, h)
         self.receptive_field_size = receptive_field_size
-        self.input_img_size = input_img_size # (n_rows, n_cols)
+        self.input_img_size = input_img_size # (w, h)
         ###############################################
 
         ### Anchor related attributes ###
@@ -186,7 +186,6 @@ class RPN(nn.Module):
 
             anchors.append([anchor_col_0, anchor_row_0, anchor_col_1, anchor_row_1])
 
-
         final_anchors = []
 
         for a in anchors:
@@ -223,12 +222,12 @@ class RPN(nn.Module):
         anchors = anchors.reshape(-1)
 
         n_anchors = 4 * len(self.anchor_ratios) * len(self.anchor_scales)
-        all_anchors = np.zeros((n_anchors, self.feature_extractor_size, self.feature_extractor_size), dtype=np.float32)
+        all_anchors = np.zeros((n_anchors, self.feature_extractor_size[1], self.feature_extractor_size[0]), dtype=np.float32)
         for k in range(0, n_anchors, 4):
-            for i in range(0, self.feature_extractor_size):
-                for j in range(0, self.feature_extractor_size):
-                    all_anchors[k + 0, i, j] = anchors[k + 0] + i * self.receptive_field_size 
-                    all_anchors[k + 1, i, j] = anchors[k + 1] + j * self.receptive_field_size
+            for i in range(0, self.feature_extractor_size[1]):
+                for j in range(0, self.feature_extractor_size[0]): # Jesus! There was a silent but dangerous bug here! Fixed!
+                    all_anchors[k + 0, i, j] = anchors[k + 0] + j * self.receptive_field_size 
+                    all_anchors[k + 1, i, j] = anchors[k + 1] + i * self.receptive_field_size
                     all_anchors[k + 2, i, j] = anchors[k + 2]
                     all_anchors[k + 3, i, j] = anchors[k + 3]
 
@@ -243,16 +242,16 @@ class RPN(nn.Module):
             aw = anchors[i, 2]
             ah = anchors[i, 3]
 
-            a0 = acw - 0.5 * (aw - 1)
-            a1 = ach - 0.5 * (ah - 1)
-            a2 = aw + a0 - 1
-            a3 = ah + a1 - 1
+            a0 = acw - 0.5 * (aw - 1.0)
+            a1 = ach - 0.5 * (ah - 1.0)
+            a2 = aw + a0 - 1.0
+            a3 = ah + a1 - 1.0
 
             # This was the implemented by me:
-            # if a0 >= 0 and a1 >= 0 and a2 <= self.input_img_size[1] - 1 and a3 <= self.input_img_size[0] - 1:
+            # if a0 >= 0 and a1 >= 0 and a2 <= self.input_img_size[0] - 1 and a3 <= self.input_img_size[1] - 1:
             # I read the original faster code, and it was implemented like this:
             # It sugests that is not considered the pixel space but a continuous space instead.
-            if a0 >= 0 and a1 >= 0 and a2 < self.input_img_size[1] and a3 < self.input_img_size[0]:
+            if a0 >= 0 and a1 >= 0 and a2 < self.input_img_size[0] and a3 < self.input_img_size[1]:
                 valid_mask[i] = 1
 
         valid_mask = torch.from_numpy(valid_mask).to(torch.bool)
@@ -261,5 +260,5 @@ class RPN(nn.Module):
         anchors = anchors[valid_mask, :]
         print('A total of {} valid anchors.'.format(anchors.size(0)))
 
-        return anchors, valid_mask #anchors_center_cols_offset, anchors_center_rows_offset, aw, ah
+        return anchors, valid_mask
 

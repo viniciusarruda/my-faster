@@ -108,11 +108,13 @@ def show_training_sample(img_np, annotation_np):
 
     img_np *= 255
     real = Image.fromarray(img_np.astype(np.uint8))
+    annotation_np = _offset2bbox(annotation_np)
 
     print('Annotation np: ', annotation_np)
 
     real_draw = ImageDraw.Draw(real)
-    real_draw.rectangle([annotation_np[0, 0], annotation_np[0, 1], annotation_np[0, 2], annotation_np[0, 3]], outline='red')
+    for i in range(annotation_np.shape[0]):
+        real_draw.rectangle([annotation_np[i, 0], annotation_np[i, 1], annotation_np[i, 2], annotation_np[i, 3]], outline='red')
     real.show()
 
 
@@ -120,10 +122,11 @@ def show_anchors(anchors_np, image_size):
 
     def _show_anchors(anchors_np, image_size, filename, just_center=False):
         offset = 128
-        img_np = np.zeros((image_size[0] + 2*offset, image_size[1] + 2*offset, 3))
+        img_np = np.zeros((image_size[1] + 2*offset, image_size[0] + 2*offset, 3))
         real = Image.fromarray(img_np.astype(np.uint8))
         real_draw = ImageDraw.Draw(real)
-        real_draw.rectangle([offset - 1, offset - 1, offset + image_size[0] - 1 + 1, offset + image_size[1] - 1 + 1], outline='yellow') # atencao para o -1 e +1 e seu significado !
+        # -1 and +1 for draw the box outside the boundary. The inside content is the content of the bbox/anchor
+        real_draw.rectangle([offset - 1, offset - 1, offset + image_size[0] - 1 + 1, offset + image_size[1] - 1 + 1], outline='yellow')
 
         for i in range(anchors_np.shape[0]):
             
@@ -247,8 +250,8 @@ def _offset2bbox(proposals):
 
     bx0 = proposals[:, 0]
     by0 = proposals[:, 1]
-    bx1 = bx0 + proposals[:, 2] - 1
-    by1 = by0 + proposals[:, 3] - 1
+    bx1 = bx0 + proposals[:, 2] - 1.0
+    by1 = by0 + proposals[:, 3] - 1.0
 
     bboxes = np.stack((bx0, by0, bx1, by1), axis=1)
 

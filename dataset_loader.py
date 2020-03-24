@@ -56,7 +56,7 @@ class MyDataset(Dataset):
         img_base_name, bboxes, labels, table_gts_positive_anchors = self.files_annot[idx]
         img_name = os.path.join(self.img_dir, img_base_name)
         image = Image.open(img_name)
-        image = transforms.Resize(self.input_img_size)(image)
+        image = transforms.Resize((self.input_img_size[1], self.input_img_size[0]))(image)
         image = transforms.ToTensor()(image)
         image = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(image)
 

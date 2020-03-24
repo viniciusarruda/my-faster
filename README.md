@@ -11,12 +11,15 @@
 # ------------------------------------------------------------------------
 
 ## About the image standard
-- The images are in the format I(n_rows, n_cols), and indexed always as (r, c)
-- The height and the width of an image is handled in the code as n_rows and n_cols, respectively.
+- Always the image and features are with the last two axis with the horizontal axis being the width and
+    the vertical being the heigh. This means that if it is a representation:
+    - Torch tensor or numpy array: [batch_size, channels, height, width] (you can think as [batch_size, channels, n_rows, n_cols])
 - The (0, 0) point is at the top left corner of the image
 
 ## Other standard
-- The format of bounding box is in x,y,n_rows,n_cols unless the variable name contains a bbox word.
+- The format of bounding box is in [x_0, y_0, x_1, y_1]. X and Y lays on the horizontal and vertical axis, respectively.
+- The format of the offset_box is in [x_0, y_0, width, height] (you can think as [x_0, y_0, n_cols, n_rows]).
+- (x_0, y_0) is the top-left corner and (x_1, y_1) is the bottom-right corner.
 
 ---
 # ------------------------------------------------------------------------
@@ -29,8 +32,7 @@
 - [x] Use the newest PyTorch version (1.4 stable)
 - [x] Use the built-in RoIAlign (do not delete the old, just comment or something similar)
 - [x] Modify NMS to output the same as the ops.nms() (make a hard unit test)
-        -> In fact, it behaves slightly different when handling degenerate boxes,
-           but nothing that gets in the way of performance.
+        -> In fact, it behaves slightly different when handling degenerate boxes (not an error, see my github issues I've opened), but nothing that gets in the way of performance.
 - [x] Use the built-in NMS (do not delete the old, just comment or something similar)
 - [x] Check these (from https://github.com/aleju/papers/blob/master/neural-nets/Faster_R-CNN.md):
     - [x] Positive examples are anchor boxes that have an IoU with a ground truth bounding box of 0.7 or more. If no anchor  point has such an IoU with a specific box, the one with the highest IoU is used instead.
@@ -50,11 +52,13 @@
         - [x] Understand why the result is not centralized
     - [future] Consider its center not the whole region (actually compare.. because the original code considers what is current implemented)
         - [future] Plot the all anchors cliping to the image size
-        These features are attempts to improve the faster. Your goal is to replicate the results.
-        At a later time this will be investigated, but not now.
+                   These features are attempts to improve the faster. Your goal is to replicate the results.
+                   At a later time this will be investigated, but not now.
     - [x] Do I need to keep all anchors or only the valid ones through the code? No, I removed.
         -[future] if removed.. the feature map can be reduced thus reducing computational processing?
-- [ ] Enable images with aspect ration different than 1 (and fix the comments accordingly)
+- [x] Enable images with aspect ration different than 1 (and fix the comments accordingly)
+    - [x] Check if the current version is giving the same output of the last version for a squared image
+        - Actually, I discovered a bug in the previous version. Now it is fixed!
 - [ ] Clean/comment/review loss.py file (check to remove duplicata as calculating the iou)
 - [ ] Document as in https://realpython.com/documenting-python-code/
 - [ ] Improve the visualization including verbose information for debugging (Tensorboard)
@@ -88,6 +92,7 @@
 # ------------------------------------------------------------------------
 - [ ] Implement my own RoIAlign (can be in python instead of C), should give similar results to the built-in (but keep the faster as default) (https://stackoverflow.com/questions/60060016/why-does-roi-align-not-seem-to-work-in-pytorch)
 - [x] Implement my own NMS, should give similar results to the built-in (but keep the faster as default)
+- [ ] Check all the items marked as [future].
 
 ---
 # ------------------------------------------------------------------------

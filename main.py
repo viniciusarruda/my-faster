@@ -81,6 +81,8 @@ def main():
         
         for img, annotation, labels, table_gts_positive_anchors in dataloader:
 
+            # show_training_sample(inv_normalize(img[0, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(), annotation[0].detach().numpy().copy())
+
             # img.size()                        -> torch.Size([1, 3, input_img_size[0], input_img_size[1]])
             # annotation.size()                 -> torch.Size([1, #bboxes_in_img, 4])
             # labels.size()                     -> torch.Size([1, #valid_anchors])

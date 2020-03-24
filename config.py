@@ -7,7 +7,8 @@ annotations_file = 'dataset/one_three_day.csv'
 
 # Size that all images will be resized to
 # The annotations will be adjusted accordinly
-input_img_size = (224, 224) # (600, 600)
+# (width, height) format
+input_img_size = (224, 224) # (300, 200) # (600, 600)
 
 # RPN batch size
 rpn_batch_size = 256

@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from rpn import RPN
-from bbox_utils import offset2bbox
+from bbox_utils import offset2bbox, anchors_offset2bbox, compute_iou
 import config
 
 
@@ -26,52 +26,13 @@ def smooth_l1(x, sigma=3.0):
 # TODO: This function is only called when generating the dataset!?
 #       if so, change the location to other file as is didn't belong here.
 def anchor_labels(anchors, gts, negative_threshold=0.3, positive_threshold=0.7):
-    # tem como simplificar e otimizar..
+
+    anchors_bbox = anchors_offset2bbox(anchors)
+
+    ious = compute_iou(gts, anchors_bbox, anchors)
 
     batch_size = gts.size(0) # number of annotations for one image
     mask = torch.zeros(batch_size, anchors.size(0))
-    ious = torch.zeros(batch_size, anchors.size(0))
-
-    anchors_bbox = torch.zeros(anchors.size(), dtype=anchors.dtype, device=anchors.device)
-    anchors_bbox[:, 0] = anchors[:, 0] - 0.5 * (anchors[:, 2] - 1)  # como proceder com o lance do -1 ou +1 nesse caso ? na conversão dos bbox2offset e vice versa ?
-    anchors_bbox[:, 1] = anchors[:, 1] - 0.5 * (anchors[:, 3] - 1)  # cuidadooooooooo p anchor eh assim, mas para proposal n .. caso for gerar label para proposal..
-    anchors_bbox[:, 2] = anchors_bbox[:, 0] + anchors[:, 2] - 1.0
-    anchors_bbox[:, 3] = anchors_bbox[:, 1] + anchors[:, 3] - 1.0
-
-    anchors_bbox_area = anchors[:, 2] * anchors[:, 3]
-    gt_area = gts[:, 2] * gts[:, 3]
-
-    # # this snippet shows that the for loop can be vectorized.. just think a little more to vectorize the rest
-    # # but, optimization is the final step!
-    # ## INI - not included.. just testing.. 
-    # print(anchors_bbox.size(), gts.size())
-    # gts[:, 0] + gts[:, 2] - 1.0
-    # all_max = torch.max(anchors_bbox, gts.unsqueeze(1))
-    # print(all_max.size())
-
-    # print(gts[:, 0].unsqueeze(1).size())
-    # x0_max = torch.max(anchors_bbox[:, 0], gts[:, 0].unsqueeze(1))
-    # print(x0_max.size())
-
-    # # this below was inside the for
-    # print(torch.equal(x0, x0_max[bi, :]))
-    # print(torch.equal(x0, all_max[bi, :, 0]))
-    # print(torch.equal(y0, all_max[bi, :, 1]))
-    # ## END - not included.. just testing.. 
-
-    for bi in range(batch_size): # maybe I can vectorize this?
-
-        x0 = torch.max(anchors_bbox[:, 0], gts[bi, 0])
-        y0 = torch.max(anchors_bbox[:, 1], gts[bi, 1])
-        x1 = torch.min(anchors_bbox[:, 2], gts[bi, 0] + gts[bi, 2] - 1.0)
-        y1 = torch.min(anchors_bbox[:, 3], gts[bi, 1] + gts[bi, 3] - 1.0)
-
-        intersection = torch.clamp(x1 - x0 + 1.0, min=0.0) * torch.clamp(y1 - y0 + 1.0, min=0.0)
-
-        union = anchors_bbox_area + gt_area[bi] - intersection
-        iou = intersection / union
-
-        ious[bi, :] = iou
 
     # Set negative anchors
     # This should be first because the next instructions can override the mask
@@ -130,38 +91,14 @@ def anchor_labels(anchors, gts, negative_threshold=0.3, positive_threshold=0.7):
     return mask, table_gts_positive_anchors
 
 
+def get_target_mask(rpn_filtered_proposals, gts, low_threshold=0.1, high_threshold=0.5):
 
+    rpn_filtered_bbox = offset2bbox(rpn_filtered_proposals)
 
-
-# taking in consideration what Rich Sutton said (about getting computing power is better), is better to find a way to get rid of
-# this expensive steps instead of trying to research other methods of doing object detection
-def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0.5):
-    # tem como simplificar e otimizar..
+    ious = compute_iou(gts, rpn_filtered_bbox, rpn_filtered_proposals)
 
     batch_size = gts.size(0)
-    cls_mask = torch.zeros(batch_size, filtered_proposals.size(0))
-    ious = torch.zeros(batch_size, filtered_proposals.size(0))
-
-    filtered_bbox = offset2bbox(filtered_proposals)
-
-    proposals_bbox_area = filtered_proposals[:, 2] * filtered_proposals[:, 3]
-    
-    gt_area = gts[:, 2] * gts[:, 3]
-
-    for bi in range(batch_size): # maybe I can vectorize this?  
-
-        x0 = torch.max(filtered_bbox[:, 0], gts[bi, 0])
-        y0 = torch.max(filtered_bbox[:, 1], gts[bi, 1])
-        x1 = torch.min(filtered_bbox[:, 2], gts[bi, 0] + gts[bi, 2] - 1)
-        y1 = torch.min(filtered_bbox[:, 3], gts[bi, 1] + gts[bi, 3] - 1)
-
-        intersection = torch.clamp(x1 - x0 + 1, min=0) * torch.clamp(y1 - y0 + 1, min=0)
-
-        union = proposals_bbox_area + gt_area[bi] - intersection
-        iou = intersection / union
-
-        ious[bi, :] = iou
-        
+    cls_mask = torch.zeros(batch_size, rpn_filtered_proposals.size(0))
 
     # Set easy background cases as don't care
     idxs = ious < low_threshold
@@ -170,21 +107,19 @@ def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0
     # Set foreground cases
     idxs = ious > high_threshold
 
-    # TODO: change the name filtered_proposals to rpn_proposals?
-
     # It is possible that a certain proposal is positive assigned to more than one box.
     # So to handle this issue, this snippet makes the proposal belong only to the box with maximum IoU.
     idxs_cond = torch.argmax(ious, dim=0)
-    cond = torch.zeros(batch_size, filtered_proposals.size(0), dtype=torch.bool)
+    cond = torch.zeros(batch_size, rpn_filtered_proposals.size(0), dtype=torch.bool)
     cond[idxs_cond, range(idxs_cond.size(0))] = True
     idxs = idxs & cond    
 
-    # TODO -> To Check! If right, keep commented.
     # It is possible that a certain box has no positive proposal assigned. 
     # But, unlike the anchor_labels() function,
     # I think that I should leave these boxes without a proposal assigned,
     # because when the RPN adjust these proposals, this function will consider as positive organically.
 
+    # Finally the mask is applied
     cls_mask[idxs] = 1.0
 
     # idx_gt, idx_positive_proposal
@@ -221,26 +156,25 @@ def get_target_mask(filtered_proposals, gts, low_threshold=0.1, high_threshold=0
 
     # if n_proposals_to_complete_batch >= n_bg_proposals:
     #     # TODO -> see the note below: There is less proposals than the batch size.. just use the available ones?
-    #     # NOTE: I decided to use just the available ones.. since this isn't commented anywhere.
+    #     # NOTE: I decided to use just the available ones.. since this isn't commented anywhere. (keep reading the comments)
 
     ### Fill the remaining batch with bg proposals
     # Annalyze if the `if` below has low rate of entrance.. if so, put the below line inside it to optimize
     bg_proposals_idxs = (cls_mask == 0).nonzero().squeeze()
     n_bg_proposals = bg_proposals_idxs.size(0)
 
+    # TODO remove the if checker if it is entering too much times here as was done in the dataset_loader.py
     if n_bg_proposals > n_proposals_to_complete_batch:
         # Sample the bg_proposals to fill the remaining batch space
         tmp_idxs = torch.randperm(n_bg_proposals)[:n_bg_proposals - n_proposals_to_complete_batch]
         idxs_to_suppress = bg_proposals_idxs[tmp_idxs]
-        # TODO -> To Check! 
-        # I think the excess is also marked as dont care too (didn't confirm - didn't find anything about it)
         cls_mask[idxs_to_suppress] = -1 # mark them as don't care
     # else, just use the available ones, which is the default behavior
 
     return table_fgs_positive_proposals, cls_mask
 
 
-def parametrize_bbox(bbox, a_bbox):
+def _parametrize_bbox(bbox, a_bbox):
 
     assert bbox.size() == a_bbox.size()
 
@@ -252,37 +186,13 @@ def parametrize_bbox(bbox, a_bbox):
     th = torch.log(h / ha)
     return tx, ty, tw, th
 
-# TODO
-# check this.. really need the table_gts_positive_anchors ?
-# comment inserting the expected input and the output and its meaning (document phase)
+
 def get_target_distance(proposals, anchors, gts, table_gts_positive_anchors):
 
-    sum_reg = 0
+    gts_idxs, anchors_idxs = table_gts_positive_anchors[:, 0], table_gts_positive_anchors[:, 1]
 
-    # txgt, tygt, twgt, thgt = parametrize_bbox(gts[bi, :].reshape(1, -1), anchors[idxs[0, :], :])
-    txgt, tygt, twgt, thgt = parametrize_bbox(gts[table_gts_positive_anchors[:, 0], :], anchors[table_gts_positive_anchors[:, 1], :])
-
-    # txp, typ, twp, thp = parametrize_bbox(proposals[idxs, :], anchors[idxs[0, :], :])
-    txp, typ, twp, thp = parametrize_bbox(proposals[table_gts_positive_anchors[:, 1], :], anchors[table_gts_positive_anchors[:, 1], :])
-
-    assert txp.size() == txgt.size()
-
-    sum_reg += smooth_l1(txp - txgt, sigma=3)
-    sum_reg += smooth_l1(typ - tygt, sigma=3)
-    sum_reg += smooth_l1(twp - twgt, sigma=3)
-    sum_reg += smooth_l1(thp - thgt, sigma=3)
-
-    # without normalization to simplify as said in the paper
-    return sum_reg # / d
-
-# Jesus, need to comment this.. I didnt understand nothing!
-def get_target_distance2(raw_reg, rpn_filtered_proposals, gts, table_fgs_positive_proposals):
-
-    # txgt, tygt, twgt, thgt = parametrize_bbox(gts[bi, :].reshape(1, -1), rpn_filtered_proposals[bi, idxs[0, :], :])
-    txgt, tygt, twgt, thgt = parametrize_bbox(gts[table_fgs_positive_proposals[:, 0], :], rpn_filtered_proposals[table_fgs_positive_proposals[:, 1], :])
-
-    # txp, typ, twp, thp = raw_reg[bi, idxs[0, :], 0], raw_reg[bi, idxs[0, :], 1], raw_reg[bi, idxs[0, :], 2], raw_reg[bi, idxs[0, :], 3]
-    txp, typ, twp, thp = raw_reg[table_fgs_positive_proposals[:, 1], 0], raw_reg[table_fgs_positive_proposals[:, 1], 1], raw_reg[table_fgs_positive_proposals[:, 1], 2], raw_reg[table_fgs_positive_proposals[:, 1], 3]
+    txgt, tygt, twgt, thgt = _parametrize_bbox(gts[gts_idxs, :], anchors[anchors_idxs, :])
+    txp, typ, twp, thp = _parametrize_bbox(proposals[anchors_idxs, :], anchors[anchors_idxs, :])
 
     assert txp.size() == txgt.size()
 
@@ -295,32 +205,35 @@ def get_target_distance2(raw_reg, rpn_filtered_proposals, gts, table_fgs_positiv
     return sum_reg # / d
 
 
-def compute_rpn_prob_loss(probs_object, labels):
+def get_target_distance2(raw_reg, rpn_filtered_proposals, gts, table_fgs_positive_proposals):
 
-    idxs = labels != -1.0  # considering all cares ! Just positive and negative samples !
+    gts_idxs, proposals_idxs = table_fgs_positive_proposals[:, 0], table_fgs_positive_proposals[:, 1]
+
+    txgt, tygt, twgt, thgt = _parametrize_bbox(gts[gts_idxs, :], rpn_filtered_proposals[proposals_idxs, :])
+    txp = raw_reg[proposals_idxs, 0]
+    typ = raw_reg[proposals_idxs, 1]
+    twp = raw_reg[proposals_idxs, 2]
+    thp = raw_reg[proposals_idxs, 3]
+
+    assert txp.size() == txgt.size()
+
+    sum_reg = smooth_l1(txp - txgt, sigma=3) + \
+              smooth_l1(typ - tygt, sigma=3) + \
+              smooth_l1(twp - twgt, sigma=3) + \
+              smooth_l1(thp - thgt, sigma=3)
 
     # without normalization to simplify as said in the paper
-    # todo so, reduction='mean'
-    # this has effect to consider the class 0 -> negative sample
-    #                             the class 1 -> positive sample
-    prob_loss = F.cross_entropy(probs_object[idxs, :], labels[idxs].long(), reduction='sum') 
-    return prob_loss # / d
+    return sum_reg # / d
 
 
-def compute_cls_reg_prob_loss(probs_object, labels):
+def compute_prob_loss(probs_object, labels):
 
-    idxs = labels != -1.0  # considering all cares ! Just backgrounds and cars samples !
-    
-    # without normalization to simplify as said in the paper
-    # todo so, reduction='mean'
-    # this has effect to consider the class 0 -> background
-    #                             the class 1 -> car
+    idxs = labels != -1.0  # considering all cares ! Just positive and negative (or backgrounds and cars if is cls_reg loss) samples !
 
-    # if labels[idxs].long().size(0) == 0:
-    #     # TODO
-    #     print('CLASS MASK WITHOUT ANY VALUE, IT WILL CONTINUE BUT SHOULD SEE THIS')
-    #     return torch.zeros(1)
+    # this has effect to consider the class 0 -> negative sample (or background if is cls_reg loss)
+    #                             the class 1 -> positive sample (or car if is cls_reg loss)
 
+    # without normalization to simplify as said in the paper, todo so, reduction='mean'
     prob_loss = F.cross_entropy(probs_object[idxs, :], labels[idxs].long(), reduction='sum') 
     return prob_loss # / d
 

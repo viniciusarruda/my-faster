@@ -8,7 +8,7 @@ from rpn import RPN
 from roi import ROI
 from classifier_regressor import ClassifierRegressor
 from see_results import see_rpn_results, show_training_sample, see_final_results, see_rpn_final_results, show_anchors, show_masked_anchors, LossViz
-from loss import anchor_labels, get_target_distance, compute_rpn_prob_loss, get_target_distance2, get_target_mask, compute_cls_reg_prob_loss
+from loss import anchor_labels, get_target_distance, get_target_distance2, get_target_mask, compute_prob_loss
 from PIL import Image
 from tqdm import tqdm, trange
 import config
@@ -116,7 +116,7 @@ def main():
 
             ## Compute RPN loss ##
             rpn_bbox_loss = get_target_distance(proposals, rpn_net.anchors, annotation, table_gts_positive_anchors)
-            rpn_prob_loss = compute_rpn_prob_loss(cls_out, labels)
+            rpn_prob_loss = compute_prob_loss(cls_out, labels)
             #####
 
             rpn_loss = 10 * rpn_prob_loss + rpn_bbox_loss
@@ -140,7 +140,7 @@ def main():
                 table_fgs_positive_proposals, cls_mask = get_target_mask(filtered_proposals, annotation)
                 clss_reg_bbox_loss = get_target_distance2(raw_reg, filtered_proposals, annotation, table_fgs_positive_proposals)
                 if (cls_mask != -1.0).sum() > 0:
-                    clss_reg_prob_loss = compute_cls_reg_prob_loss(raw_cls, cls_mask)
+                    clss_reg_prob_loss = compute_prob_loss(raw_cls, cls_mask)
                     clss_reg_loss = clss_reg_prob_loss + clss_reg_bbox_loss
                     clss_reg_prob_loss_epoch += clss_reg_prob_loss.item()
                 else:

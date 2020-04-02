@@ -59,32 +59,26 @@
 - [x] Enable images with aspect ration different than 1 (and fix the comments accordingly)
     - [x] Check if the current version is giving the same output of the last version for a squared image
         - Actually, I discovered a bug in the previous version. Now it is fixed!
-- [ ] Clean/comment/review loss.py file (check to remove duplicata as calculating the iou)
-- [ ] Document as in https://realpython.com/documenting-python-code/
+- [x] Clean/comment/review loss.py file (check to remove duplicata as calculating the iou)
+    - [future] Comments and a deeper clean have to be made when everything is done
 - [ ] Improve the visualization including verbose information for debugging (Tensorboard)
     - [ ] Include a heatmap visualization of the features right before the RPN (maybe an insight to use attention here)
+- [ ] Single image with two (and then more) objects
 - [ ] Check about the pattern of bbox. I really need to consider bbox as pixels position or continuous ? 
       If continuous, makes sense to calculade the area as w1 - w0 + 1 (so, re-check the NMS) ?
 ---------- Well done! Keep going! --------------
-- [ ] GPU compatibility (To start to train in a large dataset and debug) 
-- [ ] Increase the size of the input image
-- [ ] Increase the number of images in the training set
-- [ ] Implement the resnet as feature extractor
-- [ ] Fix the parameters for the new feature extractor
-- [ ] Implement the training strategy correctly
-- [ ] during training, use only the valid anchors, but in test, all anchors..
-- [ ] use image with different size (no multiple yet, but different sizes)
-- [ ] more anchor ratios and scales
-- [ ] single image with two (and then more) objects
-- [ ] multiple images
 - [ ] RCNN_top
+- [ ] GPU compatibility (To start to train in a large dataset and debug) 
+- [ ] Add ResNet101 (currently is ResNet18)
+- [ ] Document as in https://realpython.com/documenting-python-code/
+---------- Well done! Keep going! --------------
 - [ ] invalid anchors can be setted to -1 on labels ? (as dont care..)
 - [ ] When processing the ground truths, show warnings when a certain GT box have no associated positive anchor
 - [ ] what is the behavior when is there a not assigned gt ?
 >    checar este behavior..
      eliminar esse gt caso for isso mesmo que eu estiver pensando, pois n vai servir de nada
      partir para o treino com batch balanceado!
-- [ ] Add ResNet101 (currently is ResNet18)
+- [ ] during training, use only the valid anchors, but in test, all anchors.. (vi em algum lugar isso)
 
 ---
 # ------------------------------------------------------------------------

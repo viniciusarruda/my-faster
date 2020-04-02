@@ -105,8 +105,6 @@ class MyDataset(Dataset):
 
         tmp_idxs = torch.randperm(n_negative_anchors)[:n_negative_anchors - n_anchors_to_complete_batch]
         idxs_to_suppress = negative_anchors_idxs[tmp_idxs]
-        # TODO -> To Check! 
-        # I think the excess is also marked as dont care too (didn't confirm - didn't find anything about it)
         balanced_labels[idxs_to_suppress] = -1 # mark them as don't care
 
         # # You can see the difference before/after balancing the labels:

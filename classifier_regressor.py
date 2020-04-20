@@ -1,7 +1,8 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-from bbox_utils import bbox2offset, offset2bbox, clip_boxes, filter_boxes
+from bbox_utils import bbox2offset, offset2bbox, clip_boxes, bboxes_filter_condition
+import config
 
 from nms import nms
 
@@ -14,7 +15,7 @@ class ClassifierRegressor(nn.Module):
         self.input_img_size = input_img_size
 
         self.first_layer = nn.Linear(input_size, 4096) 
-        self.clss_pred = nn.Linear(4096, n_classes + 1)  # +1 for background
+        self.clss_pred = nn.Linear(4096, config.n_classes) # background is already included in config.n_classes
         self.reg_pred = nn.Linear(4096, 4)
 
 
@@ -37,13 +38,15 @@ class ClassifierRegressor(nn.Module):
 
         # Filter out background
         idxs_non_background = clss_idxs != 0
+        clss_idxs = clss_idxs[idxs_non_background]
         clss_score = clss_score[idxs_non_background]
         reg = reg[idxs_non_background, :]
         rpn_proposals = rpn_proposals[idxs_non_background, :]
 
         # Filter out lower scores
-        # idxs_non_lower = clss_score >= 0.7 ## I am getting all clss_scores really lows
-        idxs_non_lower = clss_score >= 0.01
+        idxs_non_lower = clss_score >= 0.7 
+        # idxs_non_lower = clss_score >= 0.01 ## I am getting all clss_scores really lows
+        clss_idxs = clss_idxs[idxs_non_lower]
         clss_score = clss_score[idxs_non_lower]
         reg = reg[idxs_non_lower, :]
         rpn_proposals = rpn_proposals[idxs_non_lower, :]
@@ -59,12 +62,17 @@ class ClassifierRegressor(nn.Module):
         bboxes = offset2bbox(refined_proposals)
         bboxes = clip_boxes(bboxes, self.input_img_size)
 
-        bboxes, clss_score = filter_boxes(bboxes, clss_score) # ??????? no rpn tem isso, fazer aqui tbm ? na verdade achei no codigo oficial que faz isso no teste sim mas no treino n.. confirmar este ultimo (treino n)
-
+        # bboxes, clss_score = filter_boxes(bboxes, clss_score)
+        cond = bboxes_filter_condition(bboxes) # ??????? no rpn tem isso, fazer aqui tbm ? na verdade achei no codigo oficial que faz isso no teste sim mas no treino n.. confirmar este ultimo (treino n)
+        bboxes, clss_score, clss_idxs = bboxes[cond, :], clss_score[cond], clss_idxs[cond]
         # apply NMS
-        bboxes, clss_score = nms(bboxes, clss_score)
+        # bboxes, clss_score = nms(bboxes, clss_score)
+        idxs_kept = nms(bboxes, clss_score)
+        bboxes = bboxes[idxs_kept, :]
+        clss_score = clss_score[idxs_kept]
+        clss_idxs = clss_idxs[idxs_kept]
 
         refined_proposals = bbox2offset(bboxes)
 
-        return refined_proposals, clss_score
+        return refined_proposals, clss_score, clss_idxs
     

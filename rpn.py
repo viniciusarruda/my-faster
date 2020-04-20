@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 import numpy as np
 from nms import nms
-from bbox_utils import bbox2offset, offset2bbox, clip_boxes, filter_boxes
+from bbox_utils import bbox2offset, offset2bbox, clip_boxes, bboxes_filter_condition
 import time
 import config
 
@@ -36,7 +36,7 @@ class RPN(nn.Module):
         self.reg_layer = nn.Conv2d(self.out_dim, self.k * 4, kernel_size=1, stride=1, padding=0)
 
 
-    def forward(self, x):
+    def forward(self, x, labels_class):
         assert x.size(0) == 1 # remove this assertion later..
         # x -> (batch_size, feature_extractor_out_dim, 64, 64)
         
@@ -93,20 +93,25 @@ class RPN(nn.Module):
         # probs_object -> (batch_size, 64 * 64 * k)
         
         # parece que o codigo original n filtra no treino.. so no teste..
-        bboxes, probs_object = filter_boxes(bboxes, probs_object) # should filter before softmax to consume less computational
+        cond = bboxes_filter_condition(bboxes) # should filter before softmax to consume less computational?
+        bboxes, probs_object, labels_class = bboxes[cond, :], probs_object[cond], labels_class[cond]
         # bboxes -> (batch_size, -1, 4)
         # probs_object -> (batch_size, -1)
 
-        bboxes, probs_object = nms(bboxes, probs_object)
+        # filtered_bboxes, probs_object, filtered_labels_class = nms(bboxes, probs_object, labels_class)
+        idxs_kept = nms(bboxes, probs_object)
+        filtered_bboxes = bboxes[idxs_kept, :]
+        probs_object = probs_object[idxs_kept]
+        filtered_labels_class = labels_class[idxs_kept]
         # bboxes -> (batch_size, -1, 4)
         # probs_object -> (batch_size, -1)
 
-        filtered_proposals = bbox2offset(bboxes)
+        filtered_proposals = bbox2offset(filtered_bboxes)
         # filtered_proposals -> (batch_size, -1, 4)
 
         ####################################
 
-        return proposals, cls_out, filtered_proposals, probs_object
+        return proposals, cls_out, filtered_proposals, probs_object, filtered_labels_class
 
 
     def _anchors2proposals(self, reg_out, cls_out):

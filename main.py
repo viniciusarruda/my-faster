@@ -13,7 +13,6 @@ from PIL import Image
 from tqdm import tqdm, trange
 import config
 
-
 import traceback
 import warnings
 import sys

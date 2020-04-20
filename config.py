@@ -5,6 +5,15 @@
 img_folder = 'dataset/one_day/'
 annotations_file = 'dataset/one_three_day.csv'
 
+# Dataset used to validate
+val_img_folder = 'dataset/validation/images/'
+val_annotations_file = 'dataset/validation/annotations.csv'
+
+# The class '__background__' must always be at zero index and the user should not use it to label your data, unless you know what you are doing.
+# class_names = ['__background__', 'car2', 'car1', 'car3']
+class_names = ['__background__', 'car']
+n_classes = len(class_names)
+
 # Size that all images will be resized to
 # The annotations will be adjusted accordinly
 # (width, height) format
@@ -33,3 +42,39 @@ pos_nms_top_n = 0
 
 # NMS threshold
 nms_threshold = 0.7
+
+
+# Visualization 
+
+GT_COLOR = 'Chartreuse'
+ANCHOR_COLOR = 'Magenta'
+OBJ_COLOR = 'DodgerBlue'
+
+COLORS = [
+    'AliceBlue', 'Aqua', 'Yellow', 'BlueViolet',
+    'BurlyWood', 'CadetBlue', 'AntiqueWhite', 'Bisque',
+    'Coral', 'CornflowerBlue', 'Cornsilk', 'Crimson', 'Cyan',
+    'DarkCyan', 'DarkGoldenRod', 'DarkGrey', 'DarkKhaki', 'DarkOrange',
+    'DarkOrchid', 'DarkSalmon', 'DarkSeaGreen', 'DarkTurquoise', 'DarkViolet',
+    'DeepPink', 'DeepSkyBlue', 'FireBrick', 'FloralWhite',
+    'ForestGreen', 'Fuchsia', 'Gainsboro', 'GhostWhite', 'Gold', 'GoldenRod',
+    'Green', 'Salmon', 'Tan', 'HoneyDew', 'HotPink', 'IndianRed', 'Ivory', 'Khaki',
+    'Lavender', 'LavenderBlush', 'LawnGreen', 'LemonChiffon', 'LightBlue',
+    'LightCoral', 'LightCyan', 'LightGoldenRodYellow', 'LightGray', 'LightGrey',
+    'LightGreen', 'LightPink', 'LightSalmon', 'LightSeaGreen', 'LightSkyBlue',
+    'LightSlateGray', 'LightSlateGrey', 'LightSteelBlue', 'LightYellow', 'Lime',
+    'LimeGreen', 'Linen', 'MediumAquaMarine', 'MediumOrchid',
+    'MediumPurple', 'MediumSeaGreen', 'MediumSlateBlue', 'MediumSpringGreen',
+    'MediumTurquoise', 'MediumVioletRed', 'MintCream', 'MistyRose', 'Moccasin',
+    'NavajoWhite', 'OldLace', 'Olive', 'OliveDrab', 'Orange', 'OrangeRed',
+    'Orchid', 'PaleGoldenRod', 'PaleGreen', 'PaleTurquoise', 'PaleVioletRed',
+    'PapayaWhip', 'PeachPuff', 'Peru', 'Pink', 'Plum', 'PowderBlue', 'Purple',
+    'Red', 'RosyBrown', 'RoyalBlue', 'SaddleBrown', 'SandyBrown',
+    'SeaGreen', 'SeaShell', 'Sienna', 'Silver', 'SkyBlue', 'SlateBlue',
+    'SlateGray', 'SlateGrey', 'Snow', 'SpringGreen', 'SteelBlue', 'GreenYellow',
+    'Teal', 'Thistle', 'Tomato', 'Turquoise', 'Violet', 'Wheat', 'White',
+    'WhiteSmoke', 'YellowGreen', 'Azure', 'Beige', 'BlanchedAlmond', 'Chocolate',
+    'Black', 'Blue', 'Aquamarine'
+]
+
+NCOLORS = len(COLORS)

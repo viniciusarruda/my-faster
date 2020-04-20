@@ -25,7 +25,11 @@ def smooth_l1(x, sigma=3.0):
 
 # TODO: This function is only called when generating the dataset!?
 #       if so, change the location to other file as is didn't belong here.
-def anchor_labels(anchors, gts, negative_threshold=0.3, positive_threshold=0.7):
+# TODO: what would happen if everything below positive threshold is set to zero ? (not object)
+#       maybe the work of the cls_reg could be less painful ? to think deeply
+#       the function of cls_reg dos not seems to only to improve and get the classes of the bbox
+#       but to help a lot the RPN! Think hard about this.. 
+def anchor_labels(anchors, gts, class_idxs, negative_threshold=0.3, positive_threshold=0.7):
 
     anchors_bbox = anchors_offset2bbox(anchors)
 
@@ -33,6 +37,7 @@ def anchor_labels(anchors, gts, negative_threshold=0.3, positive_threshold=0.7):
 
     batch_size = gts.size(0) # number of annotations for one image
     mask = torch.zeros(batch_size, anchors.size(0))
+    mask_class = torch.zeros(anchors.size(0))
 
     # Set negative anchors
     # This should be first because the next instructions can override the mask
@@ -77,25 +82,37 @@ def anchor_labels(anchors, gts, negative_threshold=0.3, positive_threshold=0.7):
     table_gts_positive_anchors = (mask == 1.0).nonzero()
 
     # Get a mask with anchors which are positive, don't care or negative.
-    mask, _ = torch.max(mask, dim=0)
+    mask_objectness, _ = torch.max(mask, dim=0)
 
     # Reverse the standard to later facilitate the use
     # It was: middle (don't care) -> 0, negative -> -1 and positive -> 1
     # And now: middle (don't care) -> -1, negative -> 0 and positive -> 1
-    idxs_middle = mask == 0.0
-    idxs_negative = mask == -1.0
+    idxs_middle = mask_objectness == 0.0
+    idxs_negative = mask_objectness == -1.0
 
-    mask[idxs_middle] = -1.0
-    mask[idxs_negative] = 0.0
+    mask_objectness[idxs_middle] = -1.0
+    mask_objectness[idxs_negative] = 0.0
 
-    return mask, table_gts_positive_anchors
+    mask_class[table_gts_positive_anchors[:, 1]] = class_idxs[table_gts_positive_anchors[:, 0]]
+
+    return mask_objectness, mask_class, table_gts_positive_anchors
 
 
-def get_target_mask(rpn_filtered_proposals, gts, low_threshold=0.1, high_threshold=0.5):
+def get_target_mask(rpn_filtered_proposals, gts, rpn_filtered_labels_class, low_threshold=0.1, high_threshold=0.5):
+
+    # here I have to get a clone of the labels class ? or not because it was already filtered? i think the same is for the labes_objectness
+    # por via das duvidas fazer o clone, quando for pra otimizar mexo nisso.
+
+    # print(gts.size())
+    # print(rpn_filtered_labels_class.size())
 
     rpn_filtered_bbox = offset2bbox(rpn_filtered_proposals)
 
     ious = compute_iou(gts, rpn_filtered_bbox, rpn_filtered_proposals)
+
+    # print(rpn_filtered_bbox.size())
+    # print(rpn_filtered_labels_class.size())
+    # print(ious.size())
 
     batch_size = gts.size(0)
     cls_mask = torch.zeros(batch_size, rpn_filtered_proposals.size(0))
@@ -103,6 +120,8 @@ def get_target_mask(rpn_filtered_proposals, gts, low_threshold=0.1, high_thresho
     # Set easy background cases as don't care
     idxs = ious < low_threshold
     cls_mask[idxs] = -1.0 
+
+    # print(cls_mask)
 
     # Set foreground cases
     idxs = ious > high_threshold
@@ -124,6 +143,7 @@ def get_target_mask(rpn_filtered_proposals, gts, low_threshold=0.1, high_thresho
 
     # idx_gt, idx_positive_proposal
     table_fgs_positive_proposals = (cls_mask == 1.0).nonzero() 
+    # TODO there is a problem here.. maybe some positive be marked as negative.. so making the table_fgs_positive_proposals not consistent.
 
     # Do not needed to reverse like the anchor_label()
     cls_mask, _ = torch.max(cls_mask, dim=0)
@@ -165,12 +185,39 @@ def get_target_mask(rpn_filtered_proposals, gts, low_threshold=0.1, high_thresho
 
     # TODO remove the if checker if it is entering too much times here as was done in the dataset_loader.py
     if n_bg_proposals > n_proposals_to_complete_batch:
+        print('there is a problem here.. maybe some positive be marked as negative.. so making the table_fgs_positive_proposals not consistent.')
+        exit()
         # Sample the bg_proposals to fill the remaining batch space
         tmp_idxs = torch.randperm(n_bg_proposals)[:n_bg_proposals - n_proposals_to_complete_batch]
         idxs_to_suppress = bg_proposals_idxs[tmp_idxs]
         cls_mask[idxs_to_suppress] = -1 # mark them as don't care
     # else, just use the available ones, which is the default behavior
 
+    # print()
+    # print(cls_mask)
+    # print(cls_mask.size())
+    # print(rpn_filtered_labels_class)
+    # print((cls_mask == -1).sum())
+    # print((cls_mask == 0).sum())
+    # print((cls_mask == 1).sum())
+    # print()
+    # print(table_fgs_positive_proposals)
+    # print(table_fgs_positive_proposals.size())
+    # print()
+
+    # checar se for negativo como comentado assima nos printf
+    # print(cls_mask)
+    # print(rpn_filtered_labels_class)
+    cls_mask[table_fgs_positive_proposals[:, 1]] = rpn_filtered_labels_class[table_fgs_positive_proposals[:, 1]]
+    # print(cls_mask)
+
+    # print()
+    # print(cls_mask)
+    # print(cls_mask.size())
+    # print((cls_mask == -1).sum())
+    # print((cls_mask == 0).sum())
+    # print((cls_mask == 1).sum())
+    
     return table_fgs_positive_proposals, cls_mask
 
 
@@ -232,8 +279,8 @@ def compute_prob_loss(probs_object, labels):
 
     # this has effect to consider the class 0 -> negative sample (or background if is cls_reg loss)
     #                             the class 1 -> positive sample (or car if is cls_reg loss)
-
     # without normalization to simplify as said in the paper, todo so, reduction='mean'
+    # TODO change the labels type to do not need this .long anymore... this can be hiding some bug
     prob_loss = F.cross_entropy(probs_object[idxs, :], labels[idxs].long(), reduction='sum') 
     return prob_loss # / d
 

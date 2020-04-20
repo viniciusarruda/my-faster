@@ -61,14 +61,37 @@
         - Actually, I discovered a bug in the previous version. Now it is fixed!
 - [x] Clean/comment/review loss.py file (check to remove duplicata as calculating the iou)
     - [future] Comments and a deeper clean have to be made when everything is done
-- [ ] Improve the visualization including verbose information for debugging (Tensorboard)
-    - [ ] Include a heatmap visualization of the features right before the RPN (maybe an insight to use attention here)
-- [ ] Single image with two (and then more) objects
+- [x] Improve the visualization including verbose information for debugging (Tensorboard)
+    - [x] Training loss
+    - [x] compare the visualizations before the editing and after
+    - [x] add final loss
+          https://github.com/ruotianluo/pytorch-faster-rcnn/blob/master/lib/utils/visualization.py
+    - [x] try to draw class name and prob on bbox
+    - [x] Keep track of some images (e.g. 10) to plot their bboxes through the training iters/epochs
+    - [x] Show all see_visualization stuff to the tensorboard.
+        - [x] If good, delete the old. If so-so, check if I can download the content of the tensorboard, if so, delete the old. If bad, keep the old fashion way. -> Both kept
+    - [near-future] Include a heatmap visualization of the features right before the RPN (maybe an insight to use attention here)
+    - [near-future] Training mAP and AP for each class throught the training iters/epochs
+    - [near-future] Show anchors and positive anchors along with its gt (just once)
+    - [near-future] Training precision - recall ? (To get the feeling of it)
+- [x] Single image with two (and then more) objects
+    - [x] Nao vai dar pra comparar como antes devido a um bug.. a n ser que eu deixe com o bug e as classes
+          tentar isso, deixar o bug e com classes para ver se da o mesmo resultado.. deveria!
+          R: Deu o mesmo resultado deixando o bug..
+- [ ] Show results of epoch and iter 0, i.e., just with random weights
+- [ ] Images with different sizes and aspect ratios
+- [ ] GPU compatibility (To start to train in a large dataset and debug) 
+- [ ] RCNN_top
+- [ ] Gerar novo baseline para comparar.
+    - [ ] Uma classe
+    - [ ] Duas classes
+    - [ ] Tres classes
+    - [ ] Cinco classes
+    - Todas devem ser checadas apos cada modificacao da rede para ver a consistencia.
+- [ ] Overfit some data.. check instability.. if persist, compare the overfiting against another Faster R-CNN implementation
 - [ ] Check about the pattern of bbox. I really need to consider bbox as pixels position or continuous ? 
       If continuous, makes sense to calculade the area as w1 - w0 + 1 (so, re-check the NMS) ?
 ---------- Well done! Keep going! --------------
-- [ ] RCNN_top
-- [ ] GPU compatibility (To start to train in a large dataset and debug) 
 - [ ] Add ResNet101 (currently is ResNet18)
 - [ ] Document as in https://realpython.com/documenting-python-code/
 ---------- Well done! Keep going! --------------

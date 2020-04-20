@@ -26,6 +26,12 @@ def nms(bboxes, probs_object):
         idxs = idxs[:n_bboxes]
         bboxes = bboxes[idxs, :]
         probs_object = probs_object[idxs]
+        # labels_class = labels_class[idxs]
+
+    else:
+        print('not implemented, when implement, test if consistent before and after')
+        print('i mean not implemented removing stuff and leaving only the idxs_kept')
+        exit()
 
     # testing if the two code outputs the same and its time
     # for while, its output are the identical also quite similar the time spent
@@ -40,18 +46,23 @@ def nms(bboxes, probs_object):
     bboxes[:, 2:] -= 1.0  # Undoing the above adjustment
     # ------------------------------------------------------------- #
 
-    bboxes = bboxes[keep, :]
-    probs_object = probs_object[keep]
+    # bboxes = bboxes[keep, :]
+    # probs_object = probs_object[keep]
+    # labels_class = labels_class[keep]
+    idxs = idxs[keep]
 
     # Filter the top pos_nms_top_n bboxes
     n_bboxes = config.pos_nms_top_n
     if n_bboxes > 0:
+        print('not implemented, when implement, test if consistent before and after')
+        print('i mean not implemented removing stuff and leaving only the idxs_kept')
+        exit()
         # already sorted by score due to `keep` indexing
         bboxes = bboxes[:n_bboxes, :]
         probs_object = probs_object[:n_bboxes]
+        labels_class = labels_class[:n_bboxes]
 
-
-    return bboxes, probs_object
+    return idxs
 
 
 # @profile # uncomment and run kernprof -lv nms.py on terminal

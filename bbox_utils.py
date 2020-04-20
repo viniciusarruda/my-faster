@@ -56,7 +56,23 @@ def clip_boxes(bboxes, input_img_size):
     return bboxes
 
 
-def filter_boxes(bboxes, probs_object, min_size=16.0):
+# def filter_boxes(bboxes, probs_object, labels_class, min_size=16.0):
+
+#     # torch.int64 -> index
+#     # torch.uint8 -> true or false (mask)
+
+#     bx0 = bboxes[:, 0]
+#     by0 = bboxes[:, 1]
+#     bx1 = bboxes[:, 2]
+#     by1 = bboxes[:, 3]
+#     bw = bx1 - bx0 + 1.0
+#     bh = by1 - by0 + 1.0
+#     cond = (bw >= min_size) & (bh >= min_size)
+    
+#     # TODO change this to return just the cond and the rest should be computed in the caller function
+#     return bboxes[cond, :], probs_object[cond], labels_class[cond]
+
+def bboxes_filter_condition(bboxes, min_size=16.0):
 
     # torch.int64 -> index
     # torch.uint8 -> true or false (mask)
@@ -69,7 +85,7 @@ def filter_boxes(bboxes, probs_object, min_size=16.0):
     bh = by1 - by0 + 1.0
     cond = (bw >= min_size) & (bh >= min_size)
     
-    return bboxes[cond, :], probs_object[cond]
+    return cond
 
 
 def anchors_offset2bbox(anchors):

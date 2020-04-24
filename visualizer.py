@@ -6,6 +6,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import config
 
+# def show_training_sample(img_np, annotation_np):
+
+#     img_np *= 255
+#     real = Image.fromarray(img_np.astype(np.uint8))
+#     annotation_np = _offset2bbox(annotation_np)
+
+#     print('Annotation np: ', annotation_np)
+
+#     real_draw = ImageDraw.Draw(real)
+#     for i in range(annotation_np.shape[0]):
+#         real_draw.rectangle([annotation_np[i, 0], annotation_np[i, 1], annotation_np[i, 2], annotation_np[i, 3]], outline='red')
+#     real.show()
+
 class Viz:
     
     def __init__(self, tensorboard=False, files=False, screen=True):

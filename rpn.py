@@ -9,7 +9,7 @@ import config
 
 class RPN(nn.Module):
 
-    def  __init__(self, input_img_size, feature_extractor_out_dim, feature_extractor_size, receptive_field_size, device):
+    def  __init__(self, input_img_size, feature_extractor_out_dim, feature_extractor_size, receptive_field_size):
     
         super(RPN, self).__init__()
 
@@ -25,10 +25,10 @@ class RPN(nn.Module):
         self.anchor_scales = config.rpn_anchor_scales
         self.k = len(self.anchor_scales) * len(self.anchor_ratios)
         self.anchors, self.valid_anchors_mask = self._get_anchors()
-        self.anchors, self.valid_anchors_mask = self.anchors.to(device), self.valid_anchors_mask.to(device)
+        # self.anchors, self.valid_anchors_mask = self.anchors.to(device), self.valid_anchors_mask.to(device)
         #################################
 
-        self.out_dim = 512
+        self.out_dim = 24
         
         self.conv_rpn = nn.Conv2d(in_channels=feature_extractor_out_dim, out_channels=self.out_dim, kernel_size=3, stride=1, padding=1, bias=True)
 
@@ -84,6 +84,7 @@ class RPN(nn.Module):
         # cls_out   -> (#valid_anchors, 2)
         ####################################
 
+        # TODO This second part should not be here.. instead.. is more a faster rcnn stuff than rpn one
         ####################################
 
         bboxes = offset2bbox(proposals)

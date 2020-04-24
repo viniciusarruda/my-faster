@@ -198,7 +198,7 @@ def _group_by_filename(data_list, class_names):
 
 def _format_data(data, anchors):
 
-    data = [(filename, torch.Tensor(bboxes), torch.Tensor(class_idxs)) for filename, bboxes, class_idxs in data]
+    data = [(filename, torch.Tensor(bboxes), torch.Tensor(class_idxs).long()) for filename, bboxes, class_idxs in data]
     new_data = []
 
     n_bboxes = 0

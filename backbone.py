@@ -4,22 +4,28 @@ import torch.nn.functional as F
 from torchvision import models
 import math
 import config
+import itertools
 
-class Backbone:
+# TODO what if backbone inherit from nn.Module
+# forward raise NotImplementedError.. just it
+
+class Backbone(nn.Module):
 
     def  __init__(self):
+
+        super(Backbone, self).__init__()
 
         self.base = None
         self.top = None
         self.cls = None
         self.reg = None
 
-    def parameters_list(self):
+    def parameters(self):
 
-        return list(self.base.parameters()) + \
-               list(self.top.parameters())  + \
-               list(self.cls.parameters())  + \
-               list(self.reg.parameters()) 
+        return itertools.chain(self.base.parameters(),
+                               self.top.parameters(),
+                               self.cls.parameters(),
+                               self.reg.parameters()) 
 
     def train(self, mode=True):
 
@@ -86,7 +92,7 @@ class ResNetBackbone(Backbone):
         # resnet 101 -> 2048
         # https://miro.medium.com/max/1400/1*aq0q7gCvuNUqnMHh4cpnIw.png
         self.cls = nn.Linear(512, config.n_classes)
-        self.reg = nn.Linear(512, 4)
+        self.reg = nn.Linear(512, 4 * (config.n_classes - 1))
 
 
         for l in [0, 1, 4]:
@@ -180,7 +186,7 @@ class ToyBackbone(Backbone):
 
         self.top = nn.Linear(7*7*self.out_dim, 4096)
         self.cls = nn.Linear(4096, config.n_classes) # background is already included in config.n_classes
-        self.reg = nn.Linear(4096, 4)
+        self.reg = nn.Linear(4096, 4 * (config.n_classes - 1))
 
 
     def top_cls_reg(self, rois):

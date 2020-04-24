@@ -36,13 +36,13 @@ def anchor_labels(anchors, gts, class_idxs, negative_threshold=0.3, positive_thr
     ious = compute_iou(gts, anchors_bbox, anchors)
 
     batch_size = gts.size(0) # number of annotations for one image
-    mask = torch.zeros(batch_size, anchors.size(0))
-    mask_class = torch.zeros(anchors.size(0))
+    mask = torch.zeros(batch_size, anchors.size(0), dtype=torch.int64)
+    mask_class = torch.zeros(anchors.size(0), dtype=torch.int64)
 
     # Set negative anchors
     # This should be first because the next instructions can override the mask
     idxs = ious < negative_threshold
-    mask[idxs] = -1.0
+    mask[idxs] = -1
 
     # Set positive anchors
     idxs = ious > positive_threshold
@@ -76,10 +76,10 @@ def anchor_labels(anchors, gts, class_idxs, negative_threshold=0.3, positive_thr
     # it makes no sense to assign another unused anchor with a lower IoU because the algorithm may be "confused", i.e., resulting in an unstable training.
 
     # Finally the mask is applied
-    mask[idxs] = 1.0
+    mask[idxs] = 1
 
     # Get a table in the following format: [box_idx, anchor_idx] relating the box with its respective positive assigned anchor
-    table_gts_positive_anchors = (mask == 1.0).nonzero()
+    table_gts_positive_anchors = (mask == 1).nonzero()
 
     # Get a mask with anchors which are positive, don't care or negative.
     mask_objectness, _ = torch.max(mask, dim=0)
@@ -87,11 +87,11 @@ def anchor_labels(anchors, gts, class_idxs, negative_threshold=0.3, positive_thr
     # Reverse the standard to later facilitate the use
     # It was: middle (don't care) -> 0, negative -> -1 and positive -> 1
     # And now: middle (don't care) -> -1, negative -> 0 and positive -> 1
-    idxs_middle = mask_objectness == 0.0
-    idxs_negative = mask_objectness == -1.0
+    idxs_middle = mask_objectness == 0
+    idxs_negative = mask_objectness == -1
 
-    mask_objectness[idxs_middle] = -1.0
-    mask_objectness[idxs_negative] = 0.0
+    mask_objectness[idxs_middle] = -1
+    mask_objectness[idxs_negative] = 0
 
     mask_class[table_gts_positive_anchors[:, 1]] = class_idxs[table_gts_positive_anchors[:, 0]]
 
@@ -115,11 +115,11 @@ def get_target_mask(rpn_filtered_proposals, gts, rpn_filtered_labels_class, low_
     # print(ious.size())
 
     batch_size = gts.size(0)
-    cls_mask = torch.zeros(batch_size, rpn_filtered_proposals.size(0))
+    cls_mask = torch.zeros(batch_size, rpn_filtered_proposals.size(0), dtype=torch.int64)
 
     # Set easy background cases as don't care
     idxs = ious < low_threshold
-    cls_mask[idxs] = -1.0 
+    cls_mask[idxs] = -1
 
     # print(cls_mask)
 
@@ -139,10 +139,10 @@ def get_target_mask(rpn_filtered_proposals, gts, rpn_filtered_labels_class, low_
     # because when the RPN adjust these proposals, this function will consider as positive organically.
 
     # Finally the mask is applied
-    cls_mask[idxs] = 1.0
+    cls_mask[idxs] = 1
 
     # idx_gt, idx_positive_proposal
-    table_fgs_positive_proposals = (cls_mask == 1.0).nonzero() 
+    table_fgs_positive_proposals = (cls_mask == 1).nonzero() 
     # TODO there is a problem here.. maybe some positive be marked as negative.. so making the table_fgs_positive_proposals not consistent.
 
     # Do not needed to reverse like the anchor_label()
@@ -207,13 +207,23 @@ def get_target_mask(rpn_filtered_proposals, gts, rpn_filtered_labels_class, low_
 
     # checar se for negativo como comentado assima nos printf
     # print(cls_mask)
+    # print(cls_mask.size())
     # print(rpn_filtered_labels_class)
     cls_mask[table_fgs_positive_proposals[:, 1]] = rpn_filtered_labels_class[table_fgs_positive_proposals[:, 1]]
     # print(cls_mask)
-
     # print()
     # print(cls_mask)
     # print(cls_mask.size())
+
+    # print()
+    # table_fgs_positive_proposals2 = torch.zeros(table_fgs_positive_proposals.size(0), 3, dtype=table_fgs_positive_proposals.dtype)
+    # table_fgs_positive_proposals2[:, :2] = table_fgs_positive_proposals
+    # table_fgs_positive_proposals2[:, 2] = cls_mask[table_fgs_positive_proposals[:, 1]]
+    table_fgs_positive_proposals = torch.cat((table_fgs_positive_proposals, cls_mask[table_fgs_positive_proposals[:, 1]].unsqueeze(1)), dim=1)
+    non_background_idxs = table_fgs_positive_proposals[:, 2] != 0
+    table_fgs_positive_proposals = table_fgs_positive_proposals[non_background_idxs]
+    table_fgs_positive_proposals[:, 2] -= 1 # fixing the classes - removing the background because it is not predicted, just ignored
+    # exit()
     # print((cls_mask == -1).sum())
     # print((cls_mask == 0).sum())
     # print((cls_mask == 1).sum())
@@ -254,13 +264,56 @@ def get_target_distance(proposals, anchors, gts, table_gts_positive_anchors):
 
 def get_target_distance2(raw_reg, rpn_filtered_proposals, gts, table_fgs_positive_proposals):
 
+    # TODO ainda n to filtrando backgroud
+    # print('---')
+    # print(raw_reg.size())
+    # print(raw_reg.view(raw_reg.size(0), -1, 4).size())
+    # print(raw_reg.view(raw_reg.size(0), -1, 4)[:, table_fgs_positive_proposals[:, 2], :].size())
+    # print()
+    # print(rpn_filtered_proposals)
+    # print(rpn_filtered_proposals.size())
+    # print()
+    # print(gts)
+    # print(gts.size()) #continue from here.. after modification check the diference of the saved 
+    # print()
+    # print(table_fgs_positive_proposals)
+    # print(table_fgs_positive_proposals.size())
+    # print('---')
+    # gts_idxs, proposals_idxs = table_fgs_positive_proposals[:, 0], table_fgs_positive_proposals[:, 1]
+    # print(gts[gts_idxs, :])
+    # print()
+    # print(rpn_filtered_proposals[proposals_idxs, :])
+    # print('===')
+    # print(raw_reg)
+    # raw_reg = raw_reg.view(raw_reg.size(0), -1, 4)
+    # txp = raw_reg[proposals_idxs, table_fgs_positive_proposals[:, 2], 0]
+    # print(txp)
+    # print(table_fgs_positive_proposals)
+    # print(gts_idxs)
+    # print(proposals_idxs)
+    # print(table_fgs_positive_proposals[:, 2])
+    # print('===')
+    # exit()
+
+    # cls_idx = 0 na tabela fgs
+
+    # raw_reg = raw_reg.view(raw_reg.size(0), -1, 4)
+    # raw_reg = raw_reg[:, idxs_from_table, :]
+
     gts_idxs, proposals_idxs = table_fgs_positive_proposals[:, 0], table_fgs_positive_proposals[:, 1]
 
     txgt, tygt, twgt, thgt = _parametrize_bbox(gts[gts_idxs, :], rpn_filtered_proposals[proposals_idxs, :])
-    txp = raw_reg[proposals_idxs, 0]
-    typ = raw_reg[proposals_idxs, 1]
-    twp = raw_reg[proposals_idxs, 2]
-    thp = raw_reg[proposals_idxs, 3]
+
+    raw_reg = raw_reg.view(raw_reg.size(0), -1, 4)
+    txp = raw_reg[proposals_idxs, table_fgs_positive_proposals[:, 2], 0]
+    typ = raw_reg[proposals_idxs, table_fgs_positive_proposals[:, 2], 1]
+    twp = raw_reg[proposals_idxs, table_fgs_positive_proposals[:, 2], 2]
+    thp = raw_reg[proposals_idxs, table_fgs_positive_proposals[:, 2], 3]
+
+    # txp = raw_reg[proposals_idxs, 0]
+    # typ = raw_reg[proposals_idxs, 1]
+    # twp = raw_reg[proposals_idxs, 2]
+    # thp = raw_reg[proposals_idxs, 3]
 
     assert txp.size() == txgt.size()
 
@@ -270,18 +323,19 @@ def get_target_distance2(raw_reg, rpn_filtered_proposals, gts, table_fgs_positiv
               smooth_l1(thp - thgt, sigma=3)
 
     # without normalization to simplify as said in the paper
+
     return sum_reg # / d
 
 
 def compute_prob_loss(probs_object, labels):
 
-    idxs = labels != -1.0  # considering all cares ! Just positive and negative (or backgrounds and cars if is cls_reg loss) samples !
-
     # this has effect to consider the class 0 -> negative sample (or background if is cls_reg loss)
     #                             the class 1 -> positive sample (or car if is cls_reg loss)
     # without normalization to simplify as said in the paper, todo so, reduction='mean'
-    # TODO change the labels type to do not need this .long anymore... this can be hiding some bug
-    prob_loss = F.cross_entropy(probs_object[idxs, :], labels[idxs].long(), reduction='sum') 
+
+    # ignore_index=-1: considering all cares ! Just positive and negative (or backgrounds and cars if is cls_reg loss) samples !
+    prob_loss = F.cross_entropy(probs_object, labels.long(), reduction='sum', ignore_index=-1) 
+    
     return prob_loss # / d
 
     

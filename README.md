@@ -78,10 +78,19 @@
     - [x] Nao vai dar pra comparar como antes devido a um bug.. a n ser que eu deixe com o bug e as classes
           tentar isso, deixar o bug e com classes para ver se da o mesmo resultado.. deveria!
           R: Deu o mesmo resultado deixando o bug..
-- [ ] Show results of epoch and iter 0, i.e., just with random weights
-- [ ] Images with different sizes and aspect ratios
+- [x] Show results of epoch and iter 0, i.e., just with random weights
+- [x] Images with different sizes and aspect ratios
+    - [impracticable] Show anchors (just once) for each image in tensorboard
+    - [x] Dataset with a single size but non-square (e.g., Cityscapes)
+    - [near-future] Dataset which images are different in size (e.g., ?) (I should rely on the DataLoader)
+- [x] RCNN_top
+    - [x] make a function for the top+cls+reg+view/mean in the backbone (specific ones)
+- [ ] Check this class agnostic stuff
+    - What this changes: Each class has its own bbox regression, but only the true labeled ones
+      are considered in the loss, background also is ignored but considered for the classification
+- [ ] Check to get laveraged from ignore_index on cross entropy loss
+- [ ] Check what should happen to the loss when there is no bbox to the second stage.
 - [ ] GPU compatibility (To start to train in a large dataset and debug) 
-- [ ] RCNN_top
 - [ ] Gerar novo baseline para comparar.
     - [ ] Uma classe
     - [ ] Duas classes
@@ -89,6 +98,7 @@
     - [ ] Cinco classes
     - Todas devem ser checadas apos cada modificacao da rede para ver a consistencia.
 - [ ] Overfit some data.. check instability.. if persist, compare the overfiting against another Faster R-CNN implementation
+- [ ] Check if the DataLoader is really efficient, if so, put the data pre-processing inside the getitem() - it will make the code simpler and to adapt to any image size easier. 
 - [ ] Check about the pattern of bbox. I really need to consider bbox as pixels position or continuous ? 
       If continuous, makes sense to calculade the area as w1 - w0 + 1 (so, re-check the NMS) ?
 ---------- Well done! Keep going! --------------

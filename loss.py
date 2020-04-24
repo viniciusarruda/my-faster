@@ -180,7 +180,7 @@ def get_target_mask(rpn_filtered_proposals, gts, rpn_filtered_labels_class, low_
 
     ### Fill the remaining batch with bg proposals
     # Annalyze if the `if` below has low rate of entrance.. if so, put the below line inside it to optimize
-    bg_proposals_idxs = (cls_mask == 0).nonzero().squeeze()
+    bg_proposals_idxs = (cls_mask == 0).nonzero().squeeze(1)
     n_bg_proposals = bg_proposals_idxs.size(0)
 
     # TODO remove the if checker if it is entering too much times here as was done in the dataset_loader.py

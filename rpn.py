@@ -28,7 +28,7 @@ class RPN(nn.Module):
         self.anchors, self.valid_anchors_mask = self.anchors.to(device), self.valid_anchors_mask.to(device)
         #################################
 
-        self.out_dim = 24 # why ? ahco que eu escolhi aleatoriamente
+        self.out_dim = 512
         
         self.conv_rpn = nn.Conv2d(in_channels=feature_extractor_out_dim, out_channels=self.out_dim, kernel_size=3, stride=1, padding=1, bias=True)
 

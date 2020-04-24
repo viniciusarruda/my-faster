@@ -9,15 +9,27 @@ annotations_file = 'dataset/one_three_day.csv'
 val_img_folder = 'dataset/validation/images/'
 val_annotations_file = 'dataset/validation/annotations.csv'
 
+# # Dataset used to train
+# img_folder = 'dataset/Cityscapes/all_val/'
+# annotations_file = 'dataset/Cityscapes/selected_val_car.csv'
+
+# # Dataset used to validate
+# val_img_folder = 'dataset/Cityscapes/all_val/'
+# val_annotations_file = 'dataset/Cityscapes/selected_val_car.csv'
+
 # The class '__background__' must always be at zero index and the user should not use it to label your data, unless you know what you are doing.
 # class_names = ['__background__', 'car2', 'car1', 'car3']
 class_names = ['__background__', 'car']
 n_classes = len(class_names)
 
+original_img_size = (256, 256) #(2048, 1024) #(256, 256)  # should get from data, maybe in the __getitem__ function
 # Size that all images will be resized to
 # The annotations will be adjusted accordinly
 # (width, height) format
-input_img_size = (224, 224) # (300, 200) # (600, 600)
+input_img_size = (224, 224) #(1024, 512) #(224, 224) # (300, 200) # (600, 600)
+
+# Available backbones: Toy, ResNet
+backbone = 'Toy'
 
 # RPN batch size
 rpn_batch_size = 256

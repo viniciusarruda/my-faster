@@ -15,8 +15,12 @@ class ROI(nn.Module):
 
     def forward(self, proposals, features):
 
-        fx = features.size(2) / self.input_img_size[0]  # ja sei a priori
-        # fy = features.size(3) / self.input_img_size[1]  # ja sei a priori
+        # input_img_size -> (width, height)
+        fx = features.size(2) / self.input_img_size[1]  # ja sei a priori
+        fy = features.size(3) / self.input_img_size[0]  # ja sei a priori
+
+        assert fx == fy # 1.0/16.0
+        # LOOK example usage.. but it is really shallow: https://github.com/jwyang/faster-rcnn.pytorch/blob/31ae20687b1b3486155809a57eeb376259a5f5d4/lib/model/roi_align/modules/roi_align.py#L18
 
         # TODO commentint out the above and setting spatial_scale to 1 shoud be equal, according to test_nms.py file
         # NOTE Actually, I think it is not possible. I think to obtain this behavior I should also resize the features.
@@ -28,7 +32,7 @@ class ROI(nn.Module):
 
         rois = torchvision.ops.roi_align(features, [proposals], (14, 14), spatial_scale=fx)
 
-        rois = F.max_pool2d(rois, kernel_size=2)
+        rois = F.max_pool2d(rois, kernel_size=2) # there is avg_pool, others use stride=1
 
         return rois
 

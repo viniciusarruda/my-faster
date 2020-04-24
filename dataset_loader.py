@@ -20,8 +20,6 @@ class MyDataset(Dataset):
                 on a sample.
         """
 
-        original_img_size = (256, 256)  # should get from data, maybe in the __getitem__ function
-
         with open(csv_file) as f:
             lines = f.readlines()
         data = [l.strip().split(',') for l in lines]
@@ -31,10 +29,10 @@ class MyDataset(Dataset):
             # TODO:
             # the -1 in input img_size is to ensure: [0, input_img_size-1],
             # but it depends if annotations is considering [0, input_img_size-1] or [1, input_img_size]
-            data[i][1][0] = (data[i][1][0] / original_img_size[0]) * (input_img_size[0] - 1.0)
-            data[i][1][1] = (data[i][1][1] / original_img_size[1]) * (input_img_size[1] - 1.0)
-            data[i][1][2] = (data[i][1][2] / original_img_size[0]) * (input_img_size[0] - 1.0)
-            data[i][1][3] = (data[i][1][3] / original_img_size[1]) * (input_img_size[1] - 1.0)
+            data[i][1][0] = (data[i][1][0] / config.original_img_size[0]) * (input_img_size[0] - 1.0)
+            data[i][1][1] = (data[i][1][1] / config.original_img_size[1]) * (input_img_size[1] - 1.0)
+            data[i][1][2] = (data[i][1][2] / config.original_img_size[0]) * (input_img_size[0] - 1.0)
+            data[i][1][3] = (data[i][1][3] / config.original_img_size[1]) * (input_img_size[1] - 1.0)
 
         _inplace_adjust_bbox2offset(data)
         data = _group_by_filename(data, config.class_names)

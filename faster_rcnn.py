@@ -12,6 +12,7 @@ from bbox_utils import bbox2offset, offset2bbox, clip_boxes, bboxes_filter_condi
 from nms import nms
 import itertools
 
+
 class FasterRCNN(nn.Module):
     
     def __init__(self):
@@ -22,7 +23,6 @@ class FasterRCNN(nn.Module):
         self.fe_net = ToyBackbone() 
         self.rpn_net = RPN(input_img_size=config.input_img_size, feature_extractor_out_dim=self.fe_net.out_dim, feature_extractor_size=self.fe_net.feature_extractor_size, receptive_field_size=self.fe_net.receptive_field_size)
         self.roi_net = ROI(input_img_size=config.input_img_size)
-
 
     def forward(self, img, annotation, labels_objectness, labels_class, table_gts_positive_anchors):
 
@@ -71,6 +71,7 @@ class FasterRCNN(nn.Module):
             # rois.size()      -> torch.Size([#filtered_proposals, fe.out_dim, roi_net.out_dim, roi_net.out_dim])
 
             raw_reg, raw_cls = self.fe_net.top_cls_reg(rois)
+            
             # raw_reg, raw_cls = self.clss_reg.forward(tmp)
             # raw_reg.size()   -> torch.Size([#filtered_proposals, 4])
             # raw_cls.size()   -> torch.Size([#filtered_proposals, 2])
@@ -97,6 +98,7 @@ class FasterRCNN(nn.Module):
                 print((cls_mask == 1.0).sum())
                 print((cls_mask > 0.0).sum())
                 print(compute_prob_loss(raw_cls, cls_mask))
+                print('else exit')
                 exit()
                 clss_reg_loss = clss_reg_bbox_loss
             #####
@@ -118,7 +120,7 @@ class FasterRCNN(nn.Module):
         # total_loss.backward()
 
         # optimizer.step()
-
+        
         return rpn_prob_loss.item(), rpn_bbox_loss.item(), rpn_loss.item(), clss_reg_prob_loss.item(), clss_reg_bbox_loss.item(), clss_reg_loss.item(), total_loss
 
 

@@ -156,22 +156,23 @@ class Viz:
                 os.mkdir('output/final_rpn/img_{}/'.format(ith))
                 os.mkdir('output/final/img_{}/'.format(ith))
 
-            img = img.numpy().copy().transpose(1, 2, 0) * 255
-            annotation = annotation.detach().numpy().copy()
-            clss_idxs = clss_idxs.detach().numpy().copy().astype(np.int)
+            # TODO Serio que tenho que fazer esse monte de coisa pra visualizar ?
+            img = img.detach().cpu().numpy().copy().transpose(1, 2, 0) * 255
+            annotation = annotation.detach().cpu().numpy().copy()
+            clss_idxs = clss_idxs.detach().cpu().numpy().copy().astype(np.int)
 
-            table_gts_positive_anchors = table_gts_positive_anchors.detach().numpy().copy()
-            proposals = proposals.detach().numpy().copy()
-            all_probs_object = all_probs_object.detach().numpy().copy()
-            anchors = anchors.detach().numpy().copy()
+            table_gts_positive_anchors = table_gts_positive_anchors.detach().cpu().numpy().copy()
+            proposals = proposals.detach().cpu().numpy().copy()
+            all_probs_object = all_probs_object.detach().cpu().numpy().copy()
+            anchors = anchors.detach().cpu().numpy().copy()
 
-            probs_object = probs_object.detach().numpy().copy()
-            filtered_proposals = filtered_proposals.detach().numpy().copy()
+            probs_object = probs_object.detach().cpu().numpy().copy()
+            filtered_proposals = filtered_proposals.detach().cpu().numpy().copy()
             
             if show_all_results:
-                clss_score = clss_score.detach().numpy().copy()
-                pred_clss_idxs = pred_clss_idxs.detach().numpy().copy() # ja esta como np.int..
-                bboxes = bboxes.detach().numpy().copy()
+                clss_score = clss_score.detach().cpu().numpy().copy()
+                pred_clss_idxs = pred_clss_idxs.detach().cpu().numpy().copy() # ja esta como np.int..
+                bboxes = bboxes.detach().cpu().numpy().copy()
 
             img = Image.fromarray(img.astype(np.uint8))
             init_rpn_img = img.copy()

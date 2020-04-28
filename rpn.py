@@ -24,7 +24,9 @@ class RPN(nn.Module):
         self.anchor_ratios = config.rpn_anchor_ratios
         self.anchor_scales = config.rpn_anchor_scales
         self.k = len(self.anchor_scales) * len(self.anchor_ratios)
-        self.anchors, self.valid_anchors_mask = self._get_anchors()
+        anchors, valid_anchors_mask = self._get_anchors()
+        self.register_buffer('anchors', anchors)
+        self.register_buffer('valid_anchors_mask', valid_anchors_mask)
         # self.anchors, self.valid_anchors_mask = self.anchors.to(device), self.valid_anchors_mask.to(device)
         #################################
 

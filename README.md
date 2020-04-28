@@ -89,7 +89,10 @@
     - What this changes: Each class has its own bbox regression, but only the true labeled ones
       are considered in the loss, background also is ignored but considered for the classification
 - [x] Check to get laveraged from ignore_index on cross entropy loss
-- [ ] GPU compatibility (To start to train in a large dataset and debug) 
+- [x] GPU compatibility (To start to train in a large dataset and debug) 
+- [ ] Get one consolidated implementation (ideally detectron2) and run it with yours settings.
+	- [ ] Compare what happens if no box or proposals is encontered.
+	- [ ] ...
 - [ ] Gerar novo baseline para comparar.
     - [ ] Uma classe
     - [ ] Duas classes

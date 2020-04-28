@@ -23,7 +23,7 @@ class MyDataset(Dataset):
         with open(csv_file) as f:
             lines = f.readlines()
         data = [l.strip().split(',') for l in lines]
-        data = [(d[0], np.array([float(d[i]) for i in range(1, len(d)-1)]), d[-1]) for d in data]
+        data = [(d[0], np.array([np.float32(d[i]) for i in range(1, len(d)-1)]), d[-1]) for d in data]
 
         for i in range(len(data)):
             # TODO:
@@ -154,7 +154,7 @@ def inv_normalize(t):
 def get_dataloader(anchors):
 
     dataset = MyDataset(img_dir=config.img_folder, csv_file=config.annotations_file, input_img_size=config.input_img_size, anchors=anchors, train=True)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=0)
     return dataloader
 
 def get_dataset(anchors):
@@ -197,6 +197,8 @@ def _group_by_filename(data_list, class_names):
 
 
 def _format_data(data, anchors):
+
+    anchors = anchors.to('cpu')
 
     data = [(filename, torch.Tensor(bboxes), torch.Tensor(class_idxs).long()) for filename, bboxes, class_idxs in data]
     new_data = []

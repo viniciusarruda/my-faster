@@ -115,7 +115,7 @@ def get_target_mask(rpn_filtered_proposals, gts, rpn_filtered_labels_class, low_
     # print(ious.size())
 
     batch_size = gts.size(0)
-    cls_mask = torch.zeros(batch_size, rpn_filtered_proposals.size(0), dtype=torch.int64)
+    cls_mask = torch.zeros(batch_size, rpn_filtered_proposals.size(0), dtype=torch.int64, device=gts.device)
 
     # Set easy background cases as don't care
     idxs = ious < low_threshold
@@ -129,7 +129,7 @@ def get_target_mask(rpn_filtered_proposals, gts, rpn_filtered_labels_class, low_
     # It is possible that a certain proposal is positive assigned to more than one box.
     # So to handle this issue, this snippet makes the proposal belong only to the box with maximum IoU.
     idxs_cond = torch.argmax(ious, dim=0)
-    cond = torch.zeros(batch_size, rpn_filtered_proposals.size(0), dtype=torch.bool)
+    cond = torch.zeros(batch_size, rpn_filtered_proposals.size(0), dtype=torch.bool, device=idxs.device)
     cond[idxs_cond, range(idxs_cond.size(0))] = True
     idxs = idxs & cond    
 
@@ -334,7 +334,8 @@ def compute_prob_loss(probs_object, labels):
     # without normalization to simplify as said in the paper, todo so, reduction='mean'
 
     # ignore_index=-1: considering all cares ! Just positive and negative (or backgrounds and cars if is cls_reg loss) samples !
-    prob_loss = F.cross_entropy(probs_object, labels.long(), reduction='sum', ignore_index=-1) 
+
+    prob_loss = F.cross_entropy(probs_object, labels, reduction='sum', ignore_index=-1) 
     
     return prob_loss # / d
 

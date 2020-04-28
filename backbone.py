@@ -44,6 +44,9 @@ class Backbone(nn.Module):
         raise NotImplementedError
 
     def to(self, device):
+        print('CHAMOOOOU ')
+        exit()
+        super(Backbone, self).to(device)
 
         self.base.to(device)
         self.top.to(device)

@@ -1,3 +1,4 @@
+#import time
 import config
 import torch
 import torch.nn.functional as F
@@ -39,7 +40,7 @@ np.random.seed(0)
 
 def main():
 
-    device = torch.device("cpu")
+    device = torch.device("cuda")
 
     viz = Viz(tensorboard=True, files=True, screen=True)
 
@@ -66,7 +67,11 @@ def main():
         clss_reg_prob_loss_epoch, clss_reg_bbox_loss_epoch, clss_reg_loss_epoch = 0, 0, 0
         total_loss_epoch = 0
 
+        #end_data_time = time.time()
         for img, annotation, _, labels_objectness, labels_class, table_gts_positive_anchors in train_dataloader:
+            #start_data_time = time.time()
+            #print(start_data_time - end_data_time)
+            #end_data_time = start_data_time
 
             # show_training_sample(inv_normalize(img[0, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(), annotation[0].detach().numpy().copy())
             
@@ -99,7 +104,7 @@ def main():
 
 
         if e % 10 == 0:
-            
+                        
             output = model.infer(e, test_dataset, device)
             viz.record_inference(output)
 

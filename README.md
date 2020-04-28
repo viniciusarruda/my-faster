@@ -43,7 +43,7 @@
     - [x] remove batch channel of bbox_utils.py 
     - [x] remove batch channel of _anchors2proposals() function
     - [x] check if output is the same before and after the modification
-- [ ] Fix valid anchors
+- [x] Fix valid anchors
     - [x] Implement visualization of the center of each anchor and valid anchor.
     - [x] Check if it is correct, the center of each valid anchor is not centralized.. why?
         - [x] Understand the _get_anchor_parameters() code

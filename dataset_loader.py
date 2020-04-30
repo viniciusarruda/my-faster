@@ -118,9 +118,10 @@ class MyDataset(Dataset):
 
         # # You can see the difference before/after balancing the labels:
         # print('---------')
-        # print((labels == -1).sum(), (labels == 0).sum(), (labels == 1).sum())
-        # print((balanced_labels == -1).sum(), (balanced_labels == 0).sum(), (balanced_labels == 1).sum())
+        # print((labels_class == -1).sum(), (labels_class == 0).sum(), (labels_class == 1).sum())
+        # print((balanced_labels_objectness == -1).sum(), (balanced_labels_objectness == 0).sum(), (balanced_labels_objectness == 1).sum())
         # print('---------')
+        # exit()
 
         return image, bboxes, clss_idxs, balanced_labels_objectness, labels_class, table_gts_positive_anchors
 

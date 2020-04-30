@@ -40,7 +40,7 @@ np.random.seed(0)
 
 def main():
 
-    device = torch.device("cuda")
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     viz = Viz(tensorboard=True, files=True, screen=True)
 
@@ -68,15 +68,15 @@ def main():
         total_loss_epoch = 0
 
         #end_data_time = time.time()
-        for img, annotation, _, labels_objectness, labels_class, table_gts_positive_anchors in train_dataloader:
+        for img, annotation, clss_idxs, labels_objectness, labels_class, table_gts_positive_anchors in train_dataloader:
             #start_data_time = time.time()
             #print(start_data_time - end_data_time)
             #end_data_time = start_data_time
 
             # show_training_sample(inv_normalize(img[0, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(), annotation[0].detach().numpy().copy())
             
-            assert img.size(0) == annotation.size(0) == labels_objectness.size(0) == labels_class.size(0) == table_gts_positive_anchors.size(0) == 1
-            img, annotation = img.to(device), annotation[0, :, :].to(device)
+            assert img.size(0) == annotation.size(0) == clss_idxs.size(0) == labels_objectness.size(0) == labels_class.size(0) == table_gts_positive_anchors.size(0) == 1
+            img, annotation, clss_idxs = img.to(device), annotation[0, :, :].to(device), clss_idxs[0, :].to(device)
             labels_objectness, labels_class, table_gts_positive_anchors = labels_objectness[0, :].to(device), labels_class[0, :].to(device), table_gts_positive_anchors[0, :, :].to(device)
 
             # print(table_gts_positive_anchors)
@@ -86,7 +86,7 @@ def main():
 
             optimizer.zero_grad()
 
-            rpn_prob_loss_item, rpn_bbox_loss_item, rpn_loss_item, clss_reg_prob_loss_item, clss_reg_bbox_loss_item, clss_reg_loss_item, total_loss = model.forward(img, annotation, labels_objectness, labels_class, table_gts_positive_anchors)
+            rpn_prob_loss_item, rpn_bbox_loss_item, rpn_loss_item, clss_reg_prob_loss_item, clss_reg_bbox_loss_item, clss_reg_loss_item, total_loss = model.forward(img, annotation, clss_idxs, labels_objectness, labels_class, table_gts_positive_anchors)
 
             rpn_prob_loss_epoch += rpn_prob_loss_item
             rpn_bbox_loss_epoch += rpn_bbox_loss_item

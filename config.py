@@ -2,9 +2,8 @@
 # TODO: standardize to more intuitive names and capslock?
 
 # Dataset used to train
-# img_folder = 'dataset/one_day/'
-# annotations_file = 'dataset/3class.csv'
 img_folder = 'dataset/one_day/'
+# annotations_file = 'dataset/3class.csv'
 annotations_file = 'dataset/one_three_day.csv'
 
 # Dataset used to validate

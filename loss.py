@@ -98,24 +98,26 @@ def anchor_labels(anchors, gts, class_idxs, negative_threshold=0.3, positive_thr
     return mask_objectness, mask_class, table_gts_positive_anchors
 
 
-def get_target_mask(rpn_filtered_proposals, gts, rpn_filtered_labels_class, low_threshold=0.1, high_threshold=0.5):
+def get_target_mask(rpn_filtered_proposals, gts, clss_idxs, rpn_filtered_labels_class, low_threshold=0.1, high_threshold=0.5):
 
     # here I have to get a clone of the labels class ? or not because it was already filtered? i think the same is for the labes_objectness
     # por via das duvidas fazer o clone, quando for pra otimizar mexo nisso.
 
-    # print(gts.size())
-    # print(rpn_filtered_labels_class.size())
+    all_proposals = torch.cat((rpn_filtered_proposals, gts), dim=0)
+    all_labels_class = torch.cat((rpn_filtered_labels_class, clss_idxs), dim=0)
+    # all_proposals = rpn_filtered_proposals
+    # all_labels_class = rpn_filtered_labels_class
 
-    rpn_filtered_bbox = offset2bbox(rpn_filtered_proposals)
+    rpn_filtered_bbox = offset2bbox(all_proposals)
 
-    ious = compute_iou(gts, rpn_filtered_bbox, rpn_filtered_proposals)
+    ious = compute_iou(gts, rpn_filtered_bbox, all_proposals)
 
     # print(rpn_filtered_bbox.size())
     # print(rpn_filtered_labels_class.size())
     # print(ious.size())
 
     batch_size = gts.size(0)
-    cls_mask = torch.zeros(batch_size, rpn_filtered_proposals.size(0), dtype=torch.int64, device=gts.device)
+    cls_mask = torch.zeros(batch_size, all_proposals.size(0), dtype=torch.int64, device=gts.device)
 
     # Set easy background cases as don't care
     idxs = ious < low_threshold
@@ -129,7 +131,7 @@ def get_target_mask(rpn_filtered_proposals, gts, rpn_filtered_labels_class, low_
     # It is possible that a certain proposal is positive assigned to more than one box.
     # So to handle this issue, this snippet makes the proposal belong only to the box with maximum IoU.
     idxs_cond = torch.argmax(ious, dim=0)
-    cond = torch.zeros(batch_size, rpn_filtered_proposals.size(0), dtype=torch.bool, device=idxs.device)
+    cond = torch.zeros(batch_size, all_proposals.size(0), dtype=torch.bool, device=idxs.device)
     cond[idxs_cond, range(idxs_cond.size(0))] = True
     idxs = idxs & cond    
 
@@ -209,7 +211,7 @@ def get_target_mask(rpn_filtered_proposals, gts, rpn_filtered_labels_class, low_
     # print(cls_mask)
     # print(cls_mask.size())
     # print(rpn_filtered_labels_class)
-    cls_mask[table_fgs_positive_proposals[:, 1]] = rpn_filtered_labels_class[table_fgs_positive_proposals[:, 1]]
+    cls_mask[table_fgs_positive_proposals[:, 1]] = all_labels_class[table_fgs_positive_proposals[:, 1]]
     # print(cls_mask)
     # print()
     # print(cls_mask)
@@ -228,7 +230,7 @@ def get_target_mask(rpn_filtered_proposals, gts, rpn_filtered_labels_class, low_
     # print((cls_mask == 0).sum())
     # print((cls_mask == 1).sum())
     
-    return table_fgs_positive_proposals, cls_mask
+    return table_fgs_positive_proposals, cls_mask, all_proposals
 
 
 def _parametrize_bbox(bbox, a_bbox):

@@ -90,17 +90,16 @@
       are considered in the loss, background also is ignored but considered for the classification
 - [x] Check to get laveraged from ignore_index on cross entropy loss
 - [x] GPU compatibility (To start to train in a large dataset and debug) 
-- [ ] Get one consolidated implementation (ideally detectron2) and run it with yours settings.
-	- [ ] Compare what happens if no box or proposals is encontered.
-	- [ ] ...
+- [x] Fix missing number of proposals
+    - Solution was add gtboxes to the set of proposals from the RPN as made in the original implementation.
+- [ ] Fix if-cases when balancing samples (there is four if-cases to fix)
+- [ ] Maybe: Change format bbox to [0, 1, 2, 3, class_idx] instead of keeping it separated
 - [ ] Gerar novo baseline para comparar.
     - [ ] Uma classe
     - [ ] Duas classes
     - [ ] Tres classes
     - [ ] Cinco classes
     - Todas devem ser checadas apos cada modificacao da rede para ver a consistencia.
-- [ ] Check what should happen to the loss when there is no bbox to the second stage.
-    There is an exit if enters in this condition. So a hard test case will help to find a case where enters in this exit and help to debug.
 - [ ] Overfit some data.. check instability.. if persist, compare the overfiting against another Faster R-CNN implementation
 - [ ] Check if the DataLoader is really efficient, if so, put the data pre-processing inside the getitem() - it will make the code simpler and to adapt to any image size easier. 
 - [ ] Check about the pattern of bbox. I really need to consider bbox as pixels position or continuous ? 

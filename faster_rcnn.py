@@ -24,7 +24,7 @@ class FasterRCNN(nn.Module):
         self.rpn_net = RPN(input_img_size=config.input_img_size, feature_extractor_out_dim=self.fe_net.out_dim, feature_extractor_size=self.fe_net.feature_extractor_size, receptive_field_size=self.fe_net.receptive_field_size)
         self.roi_net = ROI(input_img_size=config.input_img_size)
 
-    def forward(self, img, annotation, labels_objectness, labels_class, table_gts_positive_anchors):
+    def forward(self, img, annotation, clss_idxs, labels_objectness, labels_class, table_gts_positive_anchors):
 
         # self.viz.show_anchors(self.rpn_net.anchors, config.input_img_size)
         # for e, (img, annotation, _, labels_objectness, _, table_gts_positive_anchors) in enumerate(test_dataset):
@@ -49,6 +49,21 @@ class FasterRCNN(nn.Module):
         # probs_object.size()       -> torch.Size([#filtered_proposals]) #NOTE just for visualization.. temporary
         # The features object has its batch channel kept due to later use
 
+        #####
+        # essa linha de baixo tinha quee star logo abaixo da liha do rpn forward apos a filtragem
+        # e no rpn n deveria ter aquela filtragem..
+        # todo (ver se eh isso msm):
+        # tirar parte de filtragem do rpn e colocar aqui (depois pensa em função)
+        # na filtragem, vai filtrar tbm com a COND (uma matriz de filtragem) para filtrar usando os proprios indices da table_gts_positive_anchors 
+        # para saber se vai pra frente ou n, ou seja, gerando uma nova table_gts_positive_anchors para o regressor. com isso, a primeira coluna consegue indexas as classes.
+
+        table_fgs_positive_proposals, cls_mask, filtered_proposals = get_target_mask(filtered_proposals, annotation, clss_idxs, filtered_labels_class)
+        # Now, the bug has been fixed.
+        # The solution was to also use the gtboxes in the filtered_proposals set as seen in the original implementation (not mentioned in the paper and any other material)
+        # This will add the gt as "proposals" with cls_mask == 1 to them.
+        # Thus, this assertion must never fail
+        assert filtered_proposals.size(0) > 0 and (cls_mask != -1.0).sum() > 0 # keep this assertion here until the code is ready
+
         # The filtered_proposals will act as the anchors in the RPN
         # and the table_gts_positive_proposals will act as the table_gts_positive_anchors in the RPN
 
@@ -64,75 +79,28 @@ class FasterRCNN(nn.Module):
         # rpn_bbox_loss_epoch += rpn_bbox_loss.item()
         # rpn_loss_epoch += rpn_loss.item()
 
-        # if there is any proposal which is classified as an object
-        if filtered_proposals.size(0) > 0: 
-            # check how many times enters here to try to remove this if
-            rois = self.roi_net.forward(filtered_proposals, features)
-            # rois.size()      -> torch.Size([#filtered_proposals, fe.out_dim, roi_net.out_dim, roi_net.out_dim])
+        # check how many times enters here to try to remove this if
+        rois = self.roi_net.forward(filtered_proposals, features)
+        # rois.size()      -> torch.Size([#filtered_proposals, fe.out_dim, roi_net.out_dim, roi_net.out_dim])
 
-            raw_reg, raw_cls = self.fe_net.top_cls_reg(rois)
-            
-            # raw_reg, raw_cls = self.clss_reg.forward(tmp)
-            # raw_reg.size()   -> torch.Size([#filtered_proposals, 4])
-            # raw_cls.size()   -> torch.Size([#filtered_proposals, 2])
+        raw_reg, raw_cls = self.fe_net.top_cls_reg(rois)
+        # raw_reg, raw_cls = self.clss_reg.forward(tmp)
+        # raw_reg.size()   -> torch.Size([#filtered_proposals, 4])
+        # raw_cls.size()   -> torch.Size([#filtered_proposals, 2])
 
-            #####
-            ## Compute class_reg loss ##
-            # essa linha de baixo tinha quee star logo abaixo da liha do rpn forward apos a filtragem
-            # e no rpn n deveria ter aquela filtragem..
-            # todo (ver se eh isso msm):
-            # tirar parte de filtragem do rpn e colocar aqui (depois pensa em função)
-            # na filtragem, vai filtrar tbm com a COND (uma matriz de filtragem) para filtrar usando os proprios indices da table_gts_positive_anchors 
-            # para saber se vai pra frente ou n, ou seja, gerando uma nova table_gts_positive_anchors para o regressor. com isso, a primeira coluna consegue indexas as classes.
+        ## Compute class_reg loss ##
+        clss_reg_bbox_loss = get_target_distance2(raw_reg, filtered_proposals, annotation, table_fgs_positive_proposals)
+        clss_reg_prob_loss = compute_prob_loss(raw_cls, cls_mask)
+        clss_reg_loss = clss_reg_prob_loss + clss_reg_bbox_loss
 
-            table_fgs_positive_proposals, cls_mask = get_target_mask(filtered_proposals, annotation, filtered_labels_class)
-            clss_reg_bbox_loss = get_target_distance2(raw_reg, filtered_proposals, annotation, table_fgs_positive_proposals)
-            if (cls_mask != -1.0).sum() > 0:
-                clss_reg_prob_loss = compute_prob_loss(raw_cls, cls_mask)
-                clss_reg_loss = clss_reg_prob_loss + clss_reg_bbox_loss
-                # clss_reg_prob_loss_epoch += clss_reg_prob_loss.item()
-            else:
-                # check how many times enters here to try to remove this if
-                print((cls_mask == -1.0).sum())
-                print((cls_mask == 0.0).sum())
-                print((cls_mask == 1.0).sum())
-                print((cls_mask > 0.0).sum())
-                print(compute_prob_loss(raw_cls, cls_mask))
-                print('else exit')
-                exit()
-                clss_reg_loss = clss_reg_bbox_loss
-            #####
+        # clss_reg_bbox_loss_epoch += clss_reg_bbox_loss.item()
+        # clss_reg_loss_epoch += clss_reg_loss.item()
 
-            # clss_reg_bbox_loss_epoch += clss_reg_bbox_loss.item()
-            # clss_reg_loss_epoch += clss_reg_loss.item()
-
-            total_loss = rpn_loss + clss_reg_loss
-            # total_loss_epoch += total_loss.item() # note this shoulb below the else!
-            show_all_results = True
-        
-        else:
-            print('no bbox')
-            print('check this')
-            exit()
-            total_loss = rpn_loss
-            show_all_results = False
-
-        # total_loss.backward()
-
-        # optimizer.step()
+        total_loss = rpn_loss + clss_reg_loss
+        # total_loss_epoch += total_loss.item() # note this shoulb below the else!
         
         return rpn_prob_loss.item(), rpn_bbox_loss.item(), rpn_loss.item(), clss_reg_prob_loss.item(), clss_reg_bbox_loss.item(), clss_reg_loss.item(), total_loss
 
-
-        # self.viz.record(e, rpn_prob_loss_epoch / l, rpn_bbox_loss_epoch / l, rpn_loss_epoch / l, clss_reg_prob_loss_epoch / l, clss_reg_bbox_loss_epoch / l, clss_reg_loss_epoch / l, total_loss_epoch / l)
-
-        # if e % 10 == 0:
-            
-        #     output = self.infer(e, test_dataset)
-        #     self.viz.record_inference(output)
-
-        #     # for net in [self.fe_net, self.rpn_net, self.roi_net, self.clss_reg]: net.train()
-        #     for net in [self.fe_net, self.rpn_net, self.roi_net]: net.train()
 
 
     # NOTE note que este codigo eh identico ao do treino porem sem a loss e backward.. teria como fazer essa funcao funcionar para ambos treino e inferencia?
@@ -180,7 +148,9 @@ class FasterRCNN(nn.Module):
                     refined_proposals, clss_score, pred_clss_idxs = self.infer_bboxes(filtered_proposals, raw_reg, raw_cls)
 
                 else:
-
+                    print('Reproduce this.. got no filtered proposals when testing...')
+                    print('no bbox proposals by RPN while inferring')
+                    exit()
                     clss_score = None
                     pred_clss_idxs = None
                     show_all_results = False

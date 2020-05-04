@@ -48,7 +48,10 @@ def main():
 
     # isso ta uma bosta (o lance de pegar o model.rpn_net.anchors... )!
     train_dataloader = get_dataloader(model.rpn_net.anchors)
-    test_dataset = get_dataset(model.rpn_net.anchors)
+    test_dataset = get_dataset(model.rpn_net.anchors,
+                               img_dir=config.val_img_folder,
+                               csv_file=config.val_annotations_file,
+                               train=False)
 
     params = [p for p in model.parameters() if p.requires_grad == True]
 
@@ -56,6 +59,17 @@ def main():
 
     output = model.infer(0, test_dataset, device)
     viz.record_inference(output)
+
+    # viz.show_anchors(model.rpn_net.anchors, config.input_img_size)
+    # for e, (img, annotation, _, labels_objectness, _, table_gts_positive_anchors) in enumerate(get_dataset(model.rpn_net.anchors, train=True)):
+    #     img = img.unsqueeze(0)
+    #     annotation = annotation.unsqueeze(0)
+    #     labels_objectness = labels_objectness.unsqueeze(0)
+    #     table_gts_positive_anchors = table_gts_positive_anchors.unsqueeze(0)
+    #     img, annotation = img.to(device), annotation[0, :, :].to(device)
+    #     labels_objectness, table_gts_positive_anchors = labels_objectness[0, :].to(device), table_gts_positive_anchors[0, :, :].to(device)
+    #     viz.show_masked_anchors(e, model.rpn_net.anchors, labels_objectness, table_gts_positive_anchors, annotation, config.input_img_size)
+    # exit()
 
     model.train()
 

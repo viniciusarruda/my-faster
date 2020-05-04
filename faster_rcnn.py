@@ -3,39 +3,26 @@ import torch
 import torch.nn as nn
 from rpn import RPN
 from roi import ROI
-from loss import anchor_labels, get_target_distance, get_target_distance2, get_target_mask, compute_prob_loss
-from tqdm import tqdm, trange
+from loss import get_target_distance, get_target_distance2, get_target_mask, compute_prob_loss
 from dataset_loader import inv_normalize
 import torch.nn.functional as F
-from backbone import ResNetBackbone, ToyBackbone
+from backbone import ToyBackbone  # ResNetBackbone
 from bbox_utils import bbox2offset, offset2bbox, clip_boxes, bboxes_filter_condition, anchors_offset2bbox
 from nms import nms
-import itertools
 
 
 class FasterRCNN(nn.Module):
-    
+
     def __init__(self):
 
         super(FasterRCNN, self).__init__()
 
         # define the net components
-        self.fe_net = ToyBackbone() 
+        self.fe_net = ToyBackbone()
         self.rpn_net = RPN(input_img_size=config.input_img_size, feature_extractor_out_dim=self.fe_net.out_dim, feature_extractor_size=self.fe_net.feature_extractor_size, receptive_field_size=self.fe_net.receptive_field_size)
         self.roi_net = ROI(input_img_size=config.input_img_size)
 
     def forward(self, img, annotation, clss_idxs, labels_objectness, labels_class, table_gts_positive_anchors):
-
-        # self.viz.show_anchors(self.rpn_net.anchors, config.input_img_size)
-        # for e, (img, annotation, _, labels_objectness, _, table_gts_positive_anchors) in enumerate(test_dataset):
-        #     img = img.unsqueeze(0)
-        #     annotation = annotation.unsqueeze(0)
-        #     labels_objectness = labels_objectness.unsqueeze(0)
-        #     table_gts_positive_anchors = table_gts_positive_anchors.unsqueeze(0)
-        #     img, annotation = img.to(self.device), annotation[0, :, :].to(self.device)
-        #     labels_objectness, table_gts_positive_anchors = labels_objectness[0, :].to(self.device), table_gts_positive_anchors[0, :, :].to(self.device)
-        #     self.viz.show_masked_anchors(e, self.rpn_net.anchors, labels_objectness, table_gts_positive_anchors, annotation, config.input_img_size)
-        # exit()
 
         features = self.fe_net.base(img)
         # features.size() -> torch.Size([1, fe.out_dim, fe.feature_extractor_size, fe.feature_extractor_size])
@@ -54,7 +41,7 @@ class FasterRCNN(nn.Module):
         # e no rpn n deveria ter aquela filtragem..
         # todo (ver se eh isso msm):
         # tirar parte de filtragem do rpn e colocar aqui (depois pensa em função)
-        # na filtragem, vai filtrar tbm com a COND (uma matriz de filtragem) para filtrar usando os proprios indices da table_gts_positive_anchors 
+        # na filtragem, vai filtrar tbm com a COND (uma matriz de filtragem) para filtrar usando os proprios indices da table_gts_positive_anchors
         # para saber se vai pra frente ou n, ou seja, gerando uma nova table_gts_positive_anchors para o regressor. com isso, a primeira coluna consegue indexas as classes.
 
         table_fgs_positive_proposals, cls_mask, filtered_proposals = get_target_mask(filtered_proposals, annotation, clss_idxs, filtered_labels_class)
@@ -62,12 +49,12 @@ class FasterRCNN(nn.Module):
         # The solution was to also use the gtboxes in the filtered_proposals set as seen in the original implementation (not mentioned in the paper and any other material)
         # This will add the gt as "proposals" with cls_mask == 1 to them.
         # Thus, this assertion must never fail
-        assert filtered_proposals.size(0) > 0 and (cls_mask != -1.0).sum() > 0 # keep this assertion here until the code is ready
+        assert filtered_proposals.size(0) > 0 and (cls_mask != -1.0).sum() > 0  # keep this assertion here until the code is ready
 
         # The filtered_proposals will act as the anchors in the RPN
         # and the table_gts_positive_proposals will act as the table_gts_positive_anchors in the RPN
 
-        ## Compute RPN loss ##
+        # Compute RPN loss #
         rpn_bbox_loss = get_target_distance(proposals, self.rpn_net.anchors, annotation, table_gts_positive_anchors)
         rpn_prob_loss = compute_prob_loss(cls_out, labels_objectness)
         #####
@@ -88,7 +75,7 @@ class FasterRCNN(nn.Module):
         # raw_reg.size()   -> torch.Size([#filtered_proposals, 4])
         # raw_cls.size()   -> torch.Size([#filtered_proposals, 2])
 
-        ## Compute class_reg loss ##
+        # Compute class_reg loss ##
         clss_reg_bbox_loss = get_target_distance2(raw_reg, filtered_proposals, annotation, table_fgs_positive_proposals)
         clss_reg_prob_loss = compute_prob_loss(raw_cls, cls_mask)
         clss_reg_loss = clss_reg_prob_loss + clss_reg_bbox_loss
@@ -98,10 +85,8 @@ class FasterRCNN(nn.Module):
 
         total_loss = rpn_loss + clss_reg_loss
         # total_loss_epoch += total_loss.item() # note this shoulb below the else!
-        
+
         return rpn_prob_loss.item(), rpn_bbox_loss.item(), rpn_loss.item(), clss_reg_prob_loss.item(), clss_reg_bbox_loss.item(), clss_reg_loss.item(), total_loss
-
-
 
     # NOTE note que este codigo eh identico ao do treino porem sem a loss e backward.. teria como fazer essa funcao funcionar para ambos treino e inferencia?
     # quero mostrar tbm na iter zero, antes de iniciar o treino
@@ -112,16 +97,16 @@ class FasterRCNN(nn.Module):
         # for net in [self.fe_net, self.rpn_net, self.roi_net, self.clss_reg]: net.eval()
         # for net in [self.fe_net, self.rpn_net, self.roi_net]: net.eval()
         self.eval()
-        
+
         with torch.no_grad():
-            
+
             # for ith, (img, annotation, labels, table_gts_positive_anchors) in enumerate(dataloader):
             # there is a random number being generated inside the Dataloader: https://pytorch.org/docs/stable/_modules/torch/utils/data/dataloader.html#DataLoader
             # in the final version, use the dataloader if is more fancy
             for ith in range(len(dataset)):
-                
+
                 img, annotation, clss_idxs, labels_objectness, labels_class, table_gts_positive_anchors = dataset[ith]
-                
+
                 img = img.unsqueeze(0)
                 annotation = annotation.unsqueeze(0)
                 clss_idxs = clss_idxs.unsqueeze(0)
@@ -138,7 +123,7 @@ class FasterRCNN(nn.Module):
                 proposals, cls_out, filtered_proposals, probs_object, filtered_labels_class = self.rpn_net.forward(features, labels_class)
 
                 # if there is any proposal which is classified as an object
-                if filtered_proposals.size(0) > 0: # this if has to be implemented inside the visualization?
+                if filtered_proposals.size(0) > 0:  # this if has to be implemented inside the visualization?
 
                     rois = self.roi_net(filtered_proposals, features)
                     raw_reg, raw_cls = self.fe_net.top_cls_reg(rois)
@@ -156,11 +141,11 @@ class FasterRCNN(nn.Module):
                     show_all_results = False
 
                 ith_output = [epoch]
-                    
+
                 ith_output += [inv_normalize(img[0, :, :, :].clone().detach())]
                 ith_output += [offset2bbox(annotation)]
                 ith_output += [clss_idxs]
-                
+
                 ith_output += [table_gts_positive_anchors]
                 ith_output += [offset2bbox(proposals)]
                 ith_output += [F.softmax(cls_out, dim=1)]
@@ -172,7 +157,7 @@ class FasterRCNN(nn.Module):
                 ith_output += [offset2bbox(filtered_proposals)]
 
                 if show_all_results:
-                
+
                     ith_output += [clss_score]
                     ith_output += [pred_clss_idxs]
                     ith_output += [offset2bbox(refined_proposals)]
@@ -186,7 +171,6 @@ class FasterRCNN(nn.Module):
                 output.append(ith_output)
 
         return output
-
 
     def infer_bboxes(self, rpn_proposals, reg, clss):
 
@@ -202,14 +186,14 @@ class FasterRCNN(nn.Module):
         clss_score = clss_score[idxs_non_background]
         reg = reg[idxs_non_background, :]
         rpn_proposals = rpn_proposals[idxs_non_background, :]
-        
+
         assert (clss_idxs == 0).sum() == 0
 
         reg = reg.view(reg.size(0), config.n_classes - 1, 4)
-        reg = reg[torch.arange(reg.size(0)), clss_idxs - 1, :] 
+        reg = reg[torch.arange(reg.size(0)), clss_idxs - 1, :]
 
         # Filter out lower scores
-        idxs_non_lower = clss_score >= 0.7 
+        idxs_non_lower = clss_score >= 0.7
         # idxs_non_lower = clss_score >= 0.01 ## I am getting all clss_scores really lows
         clss_idxs = clss_idxs[idxs_non_lower]
         clss_score = clss_score[idxs_non_lower]
@@ -228,7 +212,7 @@ class FasterRCNN(nn.Module):
         bboxes = clip_boxes(bboxes, config.input_img_size)
 
         # bboxes, clss_score = filter_boxes(bboxes, clss_score)
-        cond = bboxes_filter_condition(bboxes) # ??????? no rpn tem isso, fazer aqui tbm ? na verdade achei no codigo oficial que faz isso no teste sim mas no treino n.. confirmar este ultimo (treino n)
+        cond = bboxes_filter_condition(bboxes)  # ??????? no rpn tem isso, fazer aqui tbm ? na verdade achei no codigo oficial que faz isso no teste sim mas no treino n.. confirmar este ultimo (treino n)
         bboxes, clss_score, clss_idxs = bboxes[cond, :], clss_score[cond], clss_idxs[cond]
         # apply NMS
         # bboxes, clss_score = nms(bboxes, clss_score)

@@ -1,4 +1,5 @@
 import torch
+import config
 
 def bbox2offset(bboxes):
     """
@@ -56,7 +57,7 @@ def clip_boxes(bboxes, input_img_size):
     return bboxes
     
 
-def bboxes_filter_condition(bboxes, min_size=16.0):
+def bboxes_filter_condition(bboxes):
 
     # torch.int64 -> index
     # torch.uint8 -> true or false (mask)
@@ -67,7 +68,7 @@ def bboxes_filter_condition(bboxes, min_size=16.0):
     by1 = bboxes[:, 3]
     bw = bx1 - bx0 + 1.0
     bh = by1 - by0 + 1.0
-    cond = (bw >= min_size) & (bh >= min_size)
+    cond = (bw >= config.min_size) & (bh >= config.min_size)
     
     return cond
 

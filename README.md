@@ -92,8 +92,15 @@
 - [x] GPU compatibility (To start to train in a large dataset and debug) 
 - [x] Fix missing number of proposals
     - Solution was add gtboxes to the set of proposals from the RPN as made in the original implementation.
-- [ ] Fix if-cases when balancing samples (there is four if-cases to fix)
-- [ ] Maybe: Change format bbox to [0, 1, 2, 3, class_idx] instead of keeping it separated
+- [x] Fix DataLoader and refine code
+    - [x] Clip the annotations to the image limits. If there is an image which has been clipped, warns the user!
+    - [x] The limits of the annotations should be in [0, img_width/img_height) ? (I answered yes!) is so, np.clip(min=0, max=img_width-eps)
+    - [x] Fix getitem() -- finish this de uma vez por todas! clean and comment code, leave just the relevant stuff, solve all issues related to it
+    - [x] fix get item and balancing stuff in the two stages.
+        - [x] CHECK CALMLY AGAIN!
+        - [x] COMPARAR TBM A VISUALIZAÇÃO POIS ESTA ESQUISITA!!! 
+    - [x] Check the annotations outputs drawn in the images.
+- [x] Fix if-cases when balancing samples (there is four if-cases to fix)
 - [ ] Gerar novo baseline para comparar.
     - [ ] Uma classe
     - [ ] Duas classes
@@ -102,8 +109,6 @@
     - Todas devem ser checadas apos cada modificacao da rede para ver a consistencia.
 - [ ] Overfit some data.. check instability.. if persist, compare the overfiting against another Faster R-CNN implementation
 - [ ] Check if the DataLoader is really efficient, if so, put the data pre-processing inside the getitem() - it will make the code simpler and to adapt to any image size easier. 
-- [ ] Check about the pattern of bbox. I really need to consider bbox as pixels position or continuous ? 
-      If continuous, makes sense to calculade the area as w1 - w0 + 1 (so, re-check the NMS) ?
 ---------- Well done! Keep going! --------------
 - [ ] Add ResNet101 (currently is ResNet18)
 - [ ] Document as in https://realpython.com/documenting-python-code/
@@ -118,11 +123,23 @@
 
 ---
 # ------------------------------------------------------------------------
+# Code organization and optimization TODO
+# ------------------------------------------------------------------------
+- [ ] Reduce repeated code into functions
+    - [ ] anchor_labels, get_target_mask and dataloader stuff
+- [ ] Maybe: Change format bbox to [0, 1, 2, 3, class_idx] instead of keeping it separated
+- [ ] Check about the pattern of bbox. I really need to consider bbox as pixels position or continuous ? 
+      If continuous, makes sense to calculade the area as w1 - w0 + 1 (so, re-check the NMS) ?
+
+---
+# ------------------------------------------------------------------------
 # Further TODO
 # ------------------------------------------------------------------------
 - [ ] Implement my own RoIAlign (can be in python instead of C), should give similar results to the built-in (but keep the faster as default) (https://stackoverflow.com/questions/60060016/why-does-roi-align-not-seem-to-work-in-pytorch)
 - [x] Implement my own NMS, should give similar results to the built-in (but keep the faster as default)
 - [ ] Check all the items marked as [future].
+- [ ] take a look at initialization.. He initialization?
+    it will be nice to implement several of them and compare
 
 ---
 # ------------------------------------------------------------------------

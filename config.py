@@ -2,45 +2,38 @@
 # TODO: standardize to more intuitive names and capslock?
 
 # Dataset used to train
-img_folder = 'dataset/one_day/'
-annotations_file = 'dataset/3class.csv'
-# annotations_file = 'dataset/one_three_day.csv'
-# annotations_file = 'dataset/test.csv'
+img_folder = 'dataset/Cityscapes/all_val/'
+annotations_file = 'dataset/Cityscapes/cityscapes_val.csv'
+# img_folder = 'dataset/one_day/'
+# annotations_file = 'dataset/3class.csv'/
+img_folder = 'dataset/BDD/day/'
+annotations_file = 'dataset/BDD/day_car.csv'
 
 # Dataset used to validate
-# val_img_folder = 'dataset/validation_multiclass/images/'
-# val_annotations_file = 'dataset/validation_multiclass/annotations.csv'
-# val_img_folder = 'dataset/validation/images/'
-# val_annotations_file = 'dataset/validation/annotations.csv'
-val_img_folder = 'dataset/one_day/'
-val_annotations_file = 'dataset/3class.csv'
-# val_annotations_file = 'dataset/test.csv'
-
-# # Dataset used to train
-# img_folder = 'dataset/Cityscapes/all_val/'
-# annotations_file = 'dataset/Cityscapes/selected_val_car.csv'
-
-# # Dataset used to validate
 # val_img_folder = 'dataset/Cityscapes/all_val/'
-# val_annotations_file = 'dataset/Cityscapes/selected_val_car.csv'
+# val_annotations_file = 'dataset/Cityscapes/selected_val.csv'
+val_img_folder = 'dataset/mini_day/'
+val_annotations_file = 'dataset/mini_day.csv'
 
 # The class '__background__' must always be at zero index and the user should not use it to label your data, unless you know what you are doing.
-# class_names = ['__background__', 'car1', 'car2', 'car3', 'car4', 'car5', 'car6', 'car7']
-class_names = ['__background__', 'car2', 'car1', 'car3']
-# class_names = ['__background__', 'car']
+# class_names = ['__background__', 'car', 'rider', 'person', 'motorcycle', 'bicycle', 'train', 'bus', 'truck']
+class_names = ['__background__', 'car']
 n_classes = len(class_names)
 
-original_img_size = (256, 256)  # (2048, 1024) #(256, 256)  # should get from data, maybe in the __getitem__ function
+# original_img_size = (2048, 1024)  # should get from data, maybe in the __getitem__ function
+original_img_size = (256, 256)  # should get from data, maybe in the __getitem__ function
 # Size that all images will be resized to
 # The annotations will be adjusted accordinly
 # (width, height) format
-input_img_size = (224, 224)  # (1024, 512) #(224, 224) # (300, 200) # (600, 600)
+# input_img_size = (512, 256)
+input_img_size = (224, 224)
 
 # minimun bbox width/height size
-min_size = 16.0
+min_size = 8.0  # training only
+# min_size = 16.0 # inference only
 
 # Available backbones: Toy, ResNet
-backbone = 'Toy'
+backbone = 'ResNet'
 
 # RPN batch size
 rpn_batch_size = 256
@@ -51,19 +44,21 @@ batch_size = 128
 fg_fraction = 0.25
 
 # Number of epochs to run
-epochs = 1000
+epochs = 20  # 1000
 
 # RPN anchor ratios and scales
-rpn_anchor_ratios = [0.8, 1, 1.2]  # [1] #[0.5, 1, 2]
-rpn_anchor_scales = [3.5, 4, 4.5]  # [4] #[8, 16, 32]
-# rpn_anchor_ratios = [1]
-# rpn_anchor_scales = [10]
+# rpn_anchor_ratios = [0.5, 1, 2]
+# rpn_anchor_scales = [4, 8, 16, 32]
+rpn_anchor_ratios = [0.8, 1, 1.2]
+rpn_anchor_scales = [3.5, 4, 4.5]
 
 # Number of top (according to score) proposals kept before NMS. Zero to not filter.
-pre_nms_top_n = 30
+pre_nms_top_n = 12000  # 30    training only
+# pre_nms_top_n = 6000  testing only
 
 # Number of top (according to score) proposals kept after NMS. Zero to not filter.
-pos_nms_top_n = 0
+pos_nms_top_n = 2000  # 0    training only
+# pos_nms_top_n = 300  testing only
 
 # NMS threshold
 nms_threshold = 0.7

@@ -1,10 +1,8 @@
-#import time
 import config
 import torch
-import torch.nn.functional as F
 import numpy as np
-from dataset_loader import get_dataloader, inv_normalize, get_dataset
-from tqdm import tqdm, trange
+from dataset_loader import get_dataloader, get_dataset
+from tqdm import trange
 from visualizer import Viz
 from faster_rcnn import FasterRCNN
 
@@ -12,12 +10,14 @@ import traceback
 import warnings
 import sys
 
+
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
 
-    log = file if hasattr(file,'write') else sys.stderr
+    log = file if hasattr(file, 'write') else sys.stderr
     traceback.print_stack(file=log)
     log.write(warnings.formatwarning(message, category, filename, lineno, line))
     exit()
+
 
 warnings.showwarning = warn_with_traceback
 
@@ -33,8 +33,8 @@ np.random.seed(0)
 
 
 # TODO
-# FIXME 
-# BUG 
+# FIXME
+# BUG
 # NOTE
 
 
@@ -53,9 +53,10 @@ def main():
                                csv_file=config.val_annotations_file,
                                train=False)
 
-    params = [p for p in model.parameters() if p.requires_grad == True]
+    params = [p for p in model.parameters() if p.requires_grad is True]
 
-    optimizer = torch.optim.Adam(params, lr=0.001)
+    optimizer = torch.optim.Adam(params, lr=0.001)  # TODO falta weight_decay
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
 
     output = model.infer(0, test_dataset, device)
     viz.record_inference(output)
@@ -73,22 +74,22 @@ def main():
 
     model.train()
 
-    l = len(train_dataloader)
+    data_size = len(train_dataloader)
 
-    for e in trange(1, config.epochs+1):
+    for e in trange(1, config.epochs + 1):
 
         rpn_prob_loss_epoch, rpn_bbox_loss_epoch, rpn_loss_epoch = 0, 0, 0
         clss_reg_prob_loss_epoch, clss_reg_bbox_loss_epoch, clss_reg_loss_epoch = 0, 0, 0
         total_loss_epoch = 0
 
-        #end_data_time = time.time()
+        # end_data_time = time.time()
         for img, annotation, clss_idxs, labels_objectness, labels_class, table_gts_positive_anchors in train_dataloader:
-            #start_data_time = time.time()
-            #print(start_data_time - end_data_time)
-            #end_data_time = start_data_time
+            # start_data_time = time.time()
+            # print(start_data_time - end_data_time)
+            # end_data_time = start_data_time
 
             # show_training_sample(inv_normalize(img[0, :, :, :].clone().detach()).permute(1, 2, 0).numpy().copy(), annotation[0].detach().numpy().copy())
-            
+
             assert img.size(0) == annotation.size(0) == clss_idxs.size(0) == labels_objectness.size(0) == labels_class.size(0) == table_gts_positive_anchors.size(0) == 1
             img, annotation, clss_idxs = img.to(device), annotation[0, :, :].to(device), clss_idxs[0, :].to(device)
             labels_objectness, labels_class, table_gts_positive_anchors = labels_objectness[0, :].to(device), labels_class[0, :].to(device), table_gts_positive_anchors[0, :, :].to(device)
@@ -114,15 +115,16 @@ def main():
 
             optimizer.step()
 
-            viz.record(e, rpn_prob_loss_epoch / l, rpn_bbox_loss_epoch / l, rpn_loss_epoch / l, clss_reg_prob_loss_epoch / l, clss_reg_bbox_loss_epoch / l, clss_reg_loss_epoch / l, total_loss_epoch / l)
+        viz.record(e, rpn_prob_loss_epoch / data_size, rpn_bbox_loss_epoch / data_size, rpn_loss_epoch / data_size, clss_reg_prob_loss_epoch / data_size, clss_reg_bbox_loss_epoch / data_size, clss_reg_loss_epoch / data_size, total_loss_epoch / data_size)
 
+        # if e % 10 == 0:
+        output = model.infer(e, test_dataset, device)
+        viz.record_inference(output)
+        model.train()
 
-        if e % 10 == 0:
-                        
-            output = model.infer(e, test_dataset, device)
-            viz.record_inference(output)
-
-            model.train()
+        # print('LR: ', optimizer.param_groups[0]['lr'])
+        # TODO record LR on tensorboard
+        scheduler.step()
 
 
 if __name__ == "__main__":

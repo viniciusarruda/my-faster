@@ -45,6 +45,9 @@ def nms(bboxes, probs_object):
     keep = torchvision.ops.nms(bboxes, probs_object, config.nms_threshold) 
     bboxes[:, 2:] -= 1.0  # Undoing the above adjustment
     # ------------------------------------------------------------- #
+    # DOCS: keep – int64 tensor with the indices of the elements that have been kept by NMS,
+    # sorted in decreasing order of scores
+    #
 
     # bboxes = bboxes[keep, :]
     # probs_object = probs_object[keep]
@@ -54,13 +57,8 @@ def nms(bboxes, probs_object):
     # Filter the top pos_nms_top_n bboxes
     n_bboxes = config.pos_nms_top_n
     if n_bboxes > 0:
-        print('not implemented, when implement, test if consistent before and after')
-        print('i mean not implemented removing stuff and leaving only the idxs_kept')
-        exit()
         # already sorted by score due to `keep` indexing
-        bboxes = bboxes[:n_bboxes, :]
-        probs_object = probs_object[:n_bboxes]
-        labels_class = labels_class[:n_bboxes]
+        idxs = idxs[:n_bboxes]
 
     return idxs
 

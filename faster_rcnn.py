@@ -6,7 +6,7 @@ from roi import ROI
 from loss import get_target_distance, get_target_distance2, get_target_mask, compute_prob_loss
 from dataset_loader import inv_normalize
 import torch.nn.functional as F
-from backbone import ToyBackbone  # ResNetBackbone
+from backbone import ToyBackbone, ResNetBackbone
 from bbox_utils import bbox2offset, offset2bbox, clip_boxes, bboxes_filter_condition, anchors_offset2bbox
 from nms import nms
 
@@ -18,7 +18,12 @@ class FasterRCNN(nn.Module):
         super(FasterRCNN, self).__init__()
 
         # define the net components
-        self.fe_net = ToyBackbone()
+        if config.backbone == 'Toy':
+            self.fe_net = ToyBackbone()
+        elif config.backbone == 'ResNet':
+            self.fe_net = ResNetBackbone()
+        else:
+            raise NotImplementedError('{} does not exist.'.format(config.backbone))
         self.rpn_net = RPN(input_img_size=config.input_img_size, feature_extractor_out_dim=self.fe_net.out_dim, feature_extractor_size=self.fe_net.feature_extractor_size, receptive_field_size=self.fe_net.receptive_field_size)
         self.roi_net = ROI(input_img_size=config.input_img_size)
 
@@ -216,7 +221,7 @@ class FasterRCNN(nn.Module):
         bboxes, clss_score, clss_idxs = bboxes[cond, :], clss_score[cond], clss_idxs[cond]
         # apply NMS
         # bboxes, clss_score = nms(bboxes, clss_score)
-        idxs_kept = nms(bboxes, clss_score)
+        idxs_kept = nms(bboxes, clss_score, nms_threshold=0.5)
         bboxes = bboxes[idxs_kept, :]
         clss_score = clss_score[idxs_kept]
         clss_idxs = clss_idxs[idxs_kept]

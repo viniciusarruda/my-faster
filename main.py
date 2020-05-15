@@ -56,21 +56,27 @@ def main():
     params = [p for p in model.parameters() if p.requires_grad is True]
 
     optimizer = torch.optim.Adam(params, lr=0.001)  # TODO falta weight_decay
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.5)
 
     output = model.infer(0, test_dataset, device)
     viz.record_inference(output)
 
-    # viz.show_anchors(model.rpn_net.anchors, config.input_img_size)
-    # for e, (img, annotation, _, labels_objectness, _, table_gts_positive_anchors) in enumerate(get_dataset(model.rpn_net.anchors, train=True)):
-    #     img = img.unsqueeze(0)
-    #     annotation = annotation.unsqueeze(0)
-    #     labels_objectness = labels_objectness.unsqueeze(0)
-    #     table_gts_positive_anchors = table_gts_positive_anchors.unsqueeze(0)
-    #     img, annotation = img.to(device), annotation[0, :, :].to(device)
-    #     labels_objectness, table_gts_positive_anchors = labels_objectness[0, :].to(device), table_gts_positive_anchors[0, :, :].to(device)
-    #     viz.show_masked_anchors(e, model.rpn_net.anchors, labels_objectness, table_gts_positive_anchors, annotation, config.input_img_size)
-    # exit()
+    # drawing the anchors
+    viz.show_anchors(model.rpn_net.anchors, config.input_img_size)
+    tmp_dataset = get_dataset(model.rpn_net.anchors,
+                              img_dir=config.val_img_folder,
+                              csv_file=config.val_annotations_file,
+                              train=False)
+    for e, (img, annotation, _, labels_objectness, _, table_gts_positive_anchors) in enumerate(tmp_dataset):
+        img = img.unsqueeze(0)
+        annotation = annotation.unsqueeze(0)
+        labels_objectness = labels_objectness.unsqueeze(0)
+        table_gts_positive_anchors = table_gts_positive_anchors.unsqueeze(0)
+        img, annotation = img.to(device), annotation[0, :, :].to(device)
+        labels_objectness, table_gts_positive_anchors = labels_objectness[0, :].to(device), table_gts_positive_anchors[0, :, :].to(device)
+        viz.show_masked_anchors(e, model.rpn_net.anchors, labels_objectness, table_gts_positive_anchors, annotation, config.input_img_size)
+    del tmp_dataset
+    # end of drawing the anchors
 
     model.train()
 
@@ -115,16 +121,16 @@ def main():
 
             optimizer.step()
 
-        viz.record(e, rpn_prob_loss_epoch / data_size, rpn_bbox_loss_epoch / data_size, rpn_loss_epoch / data_size, clss_reg_prob_loss_epoch / data_size, clss_reg_bbox_loss_epoch / data_size, clss_reg_loss_epoch / data_size, total_loss_epoch / data_size)
+        # the lr plotted is based in one parameter
+        # if there is different lr for different parameters, it will not show them, just one: param_groups[0]
+        viz.record(e, rpn_prob_loss_epoch / data_size, rpn_bbox_loss_epoch / data_size, rpn_loss_epoch / data_size, clss_reg_prob_loss_epoch / data_size, clss_reg_bbox_loss_epoch / data_size, clss_reg_loss_epoch / data_size, total_loss_epoch / data_size, optimizer.param_groups[0]['lr'])
 
         # if e % 10 == 0:
         output = model.infer(e, test_dataset, device)
         viz.record_inference(output)
         model.train()
 
-        # print('LR: ', optimizer.param_groups[0]['lr'])
-        # TODO record LR on tensorboard
-        scheduler.step()
+        # scheduler.step()
 
 
 if __name__ == "__main__":

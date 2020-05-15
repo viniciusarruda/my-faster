@@ -101,12 +101,13 @@
         - [x] COMPARAR TBM A VISUALIZAÇÃO POIS ESTA ESQUISITA!!! 
     - [x] Check the annotations outputs drawn in the images.
 - [x] Fix if-cases when balancing samples (there is four if-cases to fix)
-- [ ] Gerar novo baseline para comparar.
-    - [ ] Uma classe
-    - [ ] Duas classes
-    - [ ] Tres classes
-    - [ ] Cinco classes
-    - Todas devem ser checadas apos cada modificacao da rede para ver a consistencia.
+- [x] Review the top N pre and pos when training and testing
+- [x] Visualize the bboxes higher confidence on top. (revert the plot list since it is sorted after the nms)
+- [x] First, retrain using ResNet18 - implement to base on config.py
+- [x] Check the problem on not calling the inhirited functions on the backbone module
+- [ ] Check the necessity to assign 0 score to bboxes removed after NMS. acho que eh so pra sair as inferencias com bbox prob 0.. nas hora de calcular o map e tal
+- [ ] Implement ResNet50
+- [ ] Implement ResNet101
 - [ ] Overfit some data.. check instability.. if persist, compare the overfiting against another Faster R-CNN implementation
 - [ ] Check if the DataLoader is really efficient, if so, put the data pre-processing inside the getitem() - it will make the code simpler and to adapt to any image size easier. 
 ---------- Well done! Keep going! --------------
@@ -147,3 +148,9 @@
 # ------------------------------------------------------------------------
 - The choice of anchor scale and ratios has a huge significance and impact
 - Scaling the loss components (alpha, beta, ...) plays an important role in the optimization process
+- The high amount of anchors can lean to a big discrepancy between positive and negative anchors, being the latter much higher. The optimization finds a short-cut by kicking every class to background, being hard to the positive proposals to acquire a high probability and be passed to thw second stage.
+  To overcome this issue, a solution can be to reduce the number of proposals to be kept (top_N). This will make the batch more balanced. Why? Because when setting only the batch size for the RPN, there is a huge number of available proposals, and is highly probable that the most is negative examples, because their confident level is too high.
+- The number of top_N in the RPN is for anchors! I am always confusing with objects!!!!! This justifies the chosen number top_N to be high.
+- The tiny oscilations of the bboxes at the end of training (flickering bboxes effect) is due to the constant change of the winner anchor, i.e., the one with the highest prob. The NMS suppressed the others. So in one step, anchor A with prob 99% wins anchor B which has prob 98%, and since they overlaps with high threshold, B is suppressed by A. And in other step A gets prob, say 95%, and B gets 97%, thus A is suppressed by B.
+  How one can solve this? I propose the Mean Non-Maximum Suppression: get the mean of the bboxes coordinates along the ones which have the iou above threshold. Also, the Logarithm Weighted Mean Non-Maximum Suppression: which weights more the bboxes with higher probs than the lower ones.
+  Advantage of this: Does not need to sort? Stop flickering bboxes? Helps to improve the harder cases?

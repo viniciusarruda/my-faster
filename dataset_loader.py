@@ -129,7 +129,7 @@ class MyDataset(Dataset):
         if n_positive_anchors > self.max_positive_batch_size:
             # positive_anchors_idxs = (balanced_labels == 1).nonzero().squeeze() # the line below is faster and produce the same result
             positive_anchors_idxs = table_gts_positive_anchors[:, 1]
-            tmp_idxs = torch.randperm(n_positive_anchors)[:n_positive_anchors - self.max_positive_batch_size]
+            tmp_idxs = torch.randperm(n_positive_anchors, device=bboxes.device)[:n_positive_anchors - self.max_positive_batch_size]
             idxs_to_suppress = positive_anchors_idxs[tmp_idxs]
             balanced_labels_objectness[idxs_to_suppress] = -1  # mark them as don't care
             n_positive_anchors = self.max_positive_batch_size
@@ -145,13 +145,13 @@ class MyDataset(Dataset):
         n_anchors_to_complete_batch = self.batch_size - n_positive_anchors
 
         if n_negative_anchors > n_anchors_to_complete_batch:
-            tmp_idxs = torch.randperm(n_negative_anchors)[:n_negative_anchors - n_anchors_to_complete_batch]
+            tmp_idxs = torch.randperm(n_negative_anchors, device=bboxes.device)[:n_negative_anchors - n_anchors_to_complete_batch]
             idxs_to_suppress = negative_anchors_idxs[tmp_idxs]
             balanced_labels_objectness[idxs_to_suppress] = -1  # mark them as don't care
 
         # You can see the difference before/after balancing the labels:
         # print('---------')
-        # print((labels_class == -1).sum(), (labels_class == 0).sum(), (labels_class >= 1).sum())
+        # print((labels_objectness == -1).sum(), (labels_objectness == 0).sum(), (labels_objectness >= 1).sum())
         # print((balanced_labels_objectness == -1).sum(), (balanced_labels_objectness == 0).sum(), (balanced_labels_objectness == 1).sum())
         # print('---------')
         # exit()

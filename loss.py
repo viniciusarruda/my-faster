@@ -173,24 +173,14 @@ def get_target_mask(rpn_filtered_proposals, gts, clss_idxs, rpn_filtered_labels_
 
     max_fg_proposals = int(config.fg_fraction * config.batch_size)
 
-    # print((cls_mask == -1).sum())
-    # print((cls_mask == 0).sum())
-    # print((cls_mask >= 1).sum())
-    # print()
-
     # Select up to max_fg_proposals foreground proposals
     # The excess is marked as don't care
     if n_fg_proposals > max_fg_proposals:
         fg_proposals_idxs = table_fgs_positive_proposals[:, 1]
-        tmp_idxs = torch.randperm(n_fg_proposals)[:n_fg_proposals - max_fg_proposals]
+        tmp_idxs = torch.randperm(n_fg_proposals, device=gts.device)[:n_fg_proposals - max_fg_proposals]
         idxs_to_suppress = fg_proposals_idxs[tmp_idxs]
         cls_mask[idxs_to_suppress] = -1  # mark them as don't care
         n_fg_proposals = max_fg_proposals
-
-    # print((cls_mask == -1).sum())
-    # print((cls_mask == 0).sum())
-    # print((cls_mask >= 1).sum())
-    # print()
 
     # Fill the remaining batch with bg proposals
     # Annalyze if the `if` below has low rate of entrance.. if so, put the below line inside it to optimize
@@ -200,27 +190,13 @@ def get_target_mask(rpn_filtered_proposals, gts, clss_idxs, rpn_filtered_labels_
 
     if n_bg_proposals > n_proposals_to_complete_batch:
         # Sample the bg_proposals to fill the remaining batch space
-        tmp_idxs = torch.randperm(n_bg_proposals)[:n_bg_proposals - n_proposals_to_complete_batch]
+        tmp_idxs = torch.randperm(n_bg_proposals, device=gts.device)[:n_bg_proposals - n_proposals_to_complete_batch]
         idxs_to_suppress = bg_proposals_idxs[tmp_idxs]
         cls_mask[idxs_to_suppress] = -1  # mark them as don't care
     # else, just use the available ones, which is the default behavior
 
-    # print((cls_mask == -1).sum())
-    # tmp1 = (cls_mask == 0).sum()
-    # print((cls_mask == 1).sum())
-    # print()
-
-    # print((cls_mask == -1).sum())
-    # print((cls_mask == 0).sum())
-    # print((cls_mask >= 1).sum())
-    # print()
-    # exit()
-
-    # print(table_fgs_positive_proposals.size())
-    # print((cls_mask == -1).sum())
-    # print((cls_mask == 0).sum())
-    # print((cls_mask >= 1).sum())
-    # exit()
+    # print((cls_mask == -1).sum(), (cls_mask == 0).sum(), (cls_mask >= 1).sum())
+    # print('------------------')
 
     return table_fgs_positive_proposals, cls_mask, all_proposals
 
@@ -248,12 +224,12 @@ def get_target_distance(proposals, anchors, gts, table_gts_positive_anchors):
     assert txp.size() == txgt.size()
 
     sum_reg = smooth_l1(txp - txgt, sigma=3) + \
-              smooth_l1(typ - tygt, sigma=3) + \
-              smooth_l1(twp - twgt, sigma=3) + \
-              smooth_l1(thp - thgt, sigma=3)
+        smooth_l1(typ - tygt, sigma=3) + \
+        smooth_l1(twp - twgt, sigma=3) + \
+        smooth_l1(thp - thgt, sigma=3)
 
     # without normalization to simplify as said in the paper
-    return sum_reg # / d
+    return sum_reg  # / d
 
 
 def get_target_distance2(raw_reg, rpn_filtered_proposals, gts, table_fgs_positive_proposals):
@@ -268,7 +244,7 @@ def get_target_distance2(raw_reg, rpn_filtered_proposals, gts, table_fgs_positiv
     # print(rpn_filtered_proposals.size())
     # print()
     # print(gts)
-    # print(gts.size()) #continue from here.. after modification check the diference of the saved 
+    # print(gts.size()) #continue from here.. after modification check the diference of the saved
     # print()
     # print(table_fgs_positive_proposals)
     # print(table_fgs_positive_proposals.size())
@@ -312,13 +288,13 @@ def get_target_distance2(raw_reg, rpn_filtered_proposals, gts, table_fgs_positiv
     assert txp.size() == txgt.size()
 
     sum_reg = smooth_l1(txp - txgt, sigma=3) + \
-              smooth_l1(typ - tygt, sigma=3) + \
-              smooth_l1(twp - twgt, sigma=3) + \
-              smooth_l1(thp - thgt, sigma=3)
+        smooth_l1(typ - tygt, sigma=3) + \
+        smooth_l1(twp - twgt, sigma=3) + \
+        smooth_l1(thp - thgt, sigma=3)
 
     # without normalization to simplify as said in the paper
 
-    return sum_reg # / d
+    return sum_reg  # / d
 
 
 def compute_prob_loss(probs_object, labels):
@@ -329,9 +305,9 @@ def compute_prob_loss(probs_object, labels):
 
     # ignore_index=-1: considering all cares ! Just positive and negative (or backgrounds and cars if is cls_reg loss) samples !
 
-    prob_loss = F.cross_entropy(probs_object, labels, reduction='sum', ignore_index=-1) 
-    
-    return prob_loss # / d
+    prob_loss = F.cross_entropy(probs_object, labels, reduction='sum', ignore_index=-1)
 
-    
+    return prob_loss  # / d
+
+
 # NAO DESISTE !!!!!!!!!!!!!!!!!

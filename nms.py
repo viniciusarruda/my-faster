@@ -6,7 +6,7 @@ import config
 # TODO: keep the +1 standard or no? https://github.com/facebookresearch/Detectron/blob/master/detectron/utils/boxes.py#L23
 
 # accepts only bboxes.size() -> (#bboxes, 4) and probs_object.size() -> (#bboxes)
-def nms(bboxes, probs_object):
+def nms(bboxes, probs_object, nms_threshold):
 
     # TODO I think I will leave this here.. 
     # I want to check degenerate cases. 
@@ -19,30 +19,16 @@ def nms(bboxes, probs_object):
     assert torch.all(bboxes[:, 2] > bboxes[:, 0]) and torch.all(bboxes[:, 3] > bboxes[:, 1]) # just to ensure.. but this is dealt before I think... I am shure !!
     # actually can be assert x1_0 >= x0_0 and y1_0 >= y0_0.. No, because can get 0 for union
 
-    # Filter the top pre_nms_top_n bboxes
-    n_bboxes = config.pre_nms_top_n
-    if n_bboxes > 0:
-        idxs = torch.argsort(probs_object, descending=True)
-        idxs = idxs[:n_bboxes]
-        bboxes = bboxes[idxs, :]
-        probs_object = probs_object[idxs]
-        # labels_class = labels_class[idxs]
-
-    else:
-        print('not implemented, when implement, test if consistent before and after')
-        print('i mean not implemented removing stuff and leaving only the idxs_kept')
-        exit()
-
     # testing if the two code outputs the same and its time
     # for while, its output are the identical also quite similar the time spent
     # ------------------------------------------------------------- #
     # If using my own implementation (slower but still effective)
-    # keep = _nms(bboxes, probs_object, config.nms_threshold)
+    # keep = _nms(bboxes, probs_object, nms_threshold)
     # ------------------------------------------------------------- #
     # If using the torchvision implementation
     # https://github.com/pytorch/vision/blob/e2a8b4185e2b668b50039c91cdcf81eb4175d765/torchvision/csrc/cpu/nms_cpu.cpp
     bboxes[:, 2:] += 1.0  # The implementation doesn't add +1 while computing the width/height.
-    keep = torchvision.ops.nms(bboxes, probs_object, config.nms_threshold) 
+    keep = torchvision.ops.nms(bboxes, probs_object, nms_threshold)
     bboxes[:, 2:] -= 1.0  # Undoing the above adjustment
     # ------------------------------------------------------------- #
     # DOCS: keep – int64 tensor with the indices of the elements that have been kept by NMS,
@@ -52,15 +38,8 @@ def nms(bboxes, probs_object):
     # bboxes = bboxes[keep, :]
     # probs_object = probs_object[keep]
     # labels_class = labels_class[keep]
-    idxs = idxs[keep]
 
-    # Filter the top pos_nms_top_n bboxes
-    n_bboxes = config.pos_nms_top_n
-    if n_bboxes > 0:
-        # already sorted by score due to `keep` indexing
-        idxs = idxs[:n_bboxes]
-
-    return idxs
+    return keep
 
 
 # @profile # uncomment and run kernprof -lv nms.py on terminal

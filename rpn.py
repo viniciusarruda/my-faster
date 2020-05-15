@@ -101,11 +101,25 @@ class RPN(nn.Module):
         # bboxes -> (batch_size, -1, 4)
         # probs_object -> (batch_size, -1)
 
-        # filtered_bboxes, probs_object, filtered_labels_class = nms(bboxes, probs_object, labels_class)
-        idxs_kept = nms(bboxes, probs_object)
-        filtered_bboxes = bboxes[idxs_kept, :]
-        probs_object = probs_object[idxs_kept]
-        filtered_labels_class = labels_class[idxs_kept]
+        # Filter the top pre_nms_top_n bboxes
+        idxs = torch.argsort(probs_object, descending=True)
+        n_bboxes = config.pre_nms_top_n
+        if n_bboxes > 0:
+            idxs = idxs[:n_bboxes]
+
+        # apply nms
+        idxs_kept = nms(bboxes[idxs, :], probs_object[idxs], nms_threshold=config.nms_threshold)
+        idxs = idxs[idxs_kept]
+
+        # Filter the top pos_nms_top_n bboxes
+        n_bboxes = config.pos_nms_top_n
+        if n_bboxes > 0:
+            # already sorted by score due to `keep` indexing
+            idxs = idxs[:n_bboxes]
+
+        filtered_bboxes = bboxes[idxs, :]
+        probs_object = probs_object[idxs]
+        filtered_labels_class = labels_class[idxs]
         # bboxes -> (batch_size, -1, 4)
         # probs_object -> (batch_size, -1)
 

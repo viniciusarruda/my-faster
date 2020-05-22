@@ -38,7 +38,7 @@ min_size = 8.0  # training only
 # min_size = 16.0  # inference only
 
 # Available backbones: Toy, ResNet
-backbone = 'ResNet'
+backbone = 'ResNet18'
 
 # RPN batch size
 rpn_batch_size = 256

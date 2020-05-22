@@ -28,7 +28,20 @@ class ResNetBackbone(nn.Module):
         w, h = config.input_img_size
         # assert h == w
 
-        full_model = models.resnet18(pretrained=True)
+        # resnet 18 -> 512
+        # resnet 101 -> 2048
+        # https://miro.medium.com/max/1400/1*aq0q7gCvuNUqnMHh4cpnIw.png
+        n_layers = int(config.backbone.replace('ResNet', ''))
+        if n_layers == 18:
+            full_model = models.resnet18(pretrained=True)
+            self.out_dim = 256
+            top_out_channels = 512
+        elif n_layers == 50:
+            full_model = models.resnet50(pretrained=True)
+            self.out_dim = 1024
+            top_out_channels = 2048
+        else:
+            raise NotImplementedError('{} is not implemented!'.format(config.backbone))
 
         # l = list(full_model.children())
         # for e in l:
@@ -40,11 +53,8 @@ class ResNetBackbone(nn.Module):
         child_list = list(full_model.children())
         self.base = torch.nn.Sequential(*child_list[:7])  # equivalent to RCNN_base
         self.top = torch.nn.Sequential(child_list[7])     # equivalent to RCNN_top
-        # resnet 18 -> 512
-        # resnet 101 -> 2048
-        # https://miro.medium.com/max/1400/1*aq0q7gCvuNUqnMHh4cpnIw.png
-        self.cls = nn.Linear(512, config.n_classes)
-        self.reg = nn.Linear(512, 4 * (config.n_classes - 1))
+        self.cls = nn.Linear(top_out_channels, config.n_classes)
+        self.reg = nn.Linear(top_out_channels, 4 * (config.n_classes - 1))
 
         for l in [0, 1, 4]:
             for param in self.base[l].parameters():
@@ -58,7 +68,6 @@ class ResNetBackbone(nn.Module):
         self.base.apply(set_bn_fix)
         self.top.apply(set_bn_fix)
 
-        self.out_dim = 256  # 12     not used
         self.receptive_field_size = 16  # 4 # 2 ^ number_of_maxpool_stride_2
         self.feature_extractor_size = (math.ceil(w / self.receptive_field_size), math.ceil(h / self.receptive_field_size))  # 14 #32
 

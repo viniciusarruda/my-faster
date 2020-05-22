@@ -105,6 +105,10 @@
 - [x] Visualize the bboxes higher confidence on top. (revert the plot list since it is sorted after the nms)
 - [x] First, retrain using ResNet18 - implement to base on config.py
 - [x] Check the problem on not calling the inhirited functions on the backbone module
+- [x] Check if I really need to call cpu() before numpy on visualizer.py (R: yep!)
+    - [x] Check if already makes a copy (R: If not on cpu it copies, else does not)
+    - [x] Check what is the behavior if is already on cpu()
+    - [x] Check if there is an elegant alternative. (R: I didnt find)
 - [ ] Check the necessity to assign 0 score to bboxes removed after NMS. acho que eh so pra sair as inferencias com bbox prob 0.. nas hora de calcular o map e tal
 - [ ] Implement ResNet50
 - [ ] Implement ResNet101

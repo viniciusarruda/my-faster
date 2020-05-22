@@ -56,7 +56,7 @@ def main():
     params = [p for p in model.parameters() if p.requires_grad is True]
 
     optimizer = torch.optim.Adam(params, lr=0.001)  # TODO falta weight_decay
-    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.5)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.5)
 
     output = model.infer(0, test_dataset, device)
     viz.record_inference(output)
@@ -130,7 +130,7 @@ def main():
         viz.record_inference(output)
         model.train()
 
-        # scheduler.step()
+        scheduler.step()
 
 
 if __name__ == "__main__":

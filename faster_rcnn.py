@@ -18,9 +18,10 @@ class FasterRCNN(nn.Module):
         super(FasterRCNN, self).__init__()
 
         # define the net components
+        print('\nUsing {}\n'.format(config.backbone))
         if config.backbone == 'Toy':
             self.fe_net = ToyBackbone()
-        elif config.backbone == 'ResNet':
+        elif 'ResNet' in config.backbone:
             self.fe_net = ResNetBackbone()
         else:
             raise NotImplementedError('{} does not exist.'.format(config.backbone))

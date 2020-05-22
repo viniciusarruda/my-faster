@@ -4,22 +4,22 @@ import torch.nn.functional as F
 import numpy as np
 from nms import nms
 from bbox_utils import bbox2offset, offset2bbox, clip_boxes, bboxes_filter_condition
-import time
 import config
+
 
 class RPN(nn.Module):
 
-    def  __init__(self, input_img_size, feature_extractor_out_dim, feature_extractor_size, receptive_field_size):
-    
+    def __init__(self, input_img_size, feature_extractor_out_dim, feature_extractor_size, receptive_field_size):
+
         super(RPN, self).__init__()
 
-        ### Information about the feature extractor ###
-        self.feature_extractor_size = feature_extractor_size # (w, h)
+        # ## Information about the feature extractor ###
+        self.feature_extractor_size = feature_extractor_size  # (w, h)
         self.receptive_field_size = receptive_field_size
-        self.input_img_size = input_img_size # (w, h)
+        self.input_img_size = input_img_size  # (w, h)
         ###############################################
 
-        ### Anchor related attributes ###
+        # ## Anchor related attributes ###
         # acredito que ao implementar a resnet como feature extractor pode melhorar colocando mais ratios e scales, ficou ruim do jeito que esta
         self.anchor_ratios = config.rpn_anchor_ratios
         self.anchor_scales = config.rpn_anchor_scales
@@ -30,22 +30,19 @@ class RPN(nn.Module):
         # self.anchors, self.valid_anchors_mask = self.anchors.to(device), self.valid_anchors_mask.to(device)
         #################################
 
-        self.out_dim = 24
-        
-        self.conv_rpn = nn.Conv2d(in_channels=feature_extractor_out_dim, out_channels=self.out_dim, kernel_size=3, stride=1, padding=1, bias=True)
+        self.conv_rpn = nn.Conv2d(in_channels=feature_extractor_out_dim, out_channels=512, kernel_size=3, stride=1, padding=1, bias=True)
 
-        self.cls_layer = nn.Conv2d(self.out_dim, self.k * 2, kernel_size=1, stride=1, padding=0)
-        self.reg_layer = nn.Conv2d(self.out_dim, self.k * 4, kernel_size=1, stride=1, padding=0)
-
+        self.cls_layer = nn.Conv2d(in_channels=512, out_channels=self.k * 2, kernel_size=1, stride=1, padding=0)
+        self.reg_layer = nn.Conv2d(in_channels=512, out_channels=self.k * 4, kernel_size=1, stride=1, padding=0)
 
     def forward(self, x, labels_class):
-        assert x.size(0) == 1 # remove this assertion later..
+        assert x.size(0) == 1  # remove this assertion later..
         # x -> (batch_size, feature_extractor_out_dim, 64, 64)
-        
+
         x = F.relu(self.conv_rpn(x))
         # x -> (batch_size, feature_extractor_out_dim, 64, 64)
-    
-        ### Compute the probability to be an object ###
+
+        # ## Compute the probability to be an object ###
 
         cls_out = self.cls_layer(x)
         # cls_out -> (batch_size, k * 2, 64, 64)
@@ -60,7 +57,7 @@ class RPN(nn.Module):
         # Changed the above lines to the next ones
         # cls_out = cls_out.permute(0, 2, 3, 1).reshape((batch_size, -1, 2))
         # cls_out -> (batch_size, 64 * 64 * k, 2)
-        
+
         cls_out = cls_out[0, :, :, :]
         # cls_out = cls_out.permute(1, 2, 0).reshape((-1, 2))
         # The below is the same as above, but explicit
@@ -68,17 +65,17 @@ class RPN(nn.Module):
         # cls_out -> (64 * 64 * k, 2)
         ###############################################
 
-        ### Compute the object proposals ###
+        # ## Compute the object proposals ###
 
         reg_out = self.reg_layer(x)
         # reg_out -> (batch_size, k * 4, 64, 64)
 
         # Changed the above lines to the next ones
-        # reg_out = reg_out.permute(0, 2, 3, 1).reshape(batch_size, -1, 4) 
+        # reg_out = reg_out.permute(0, 2, 3, 1).reshape(batch_size, -1, 4)
         # reg_out -> (batch_size, 64 * 64 * k, 4)
 
         reg_out = reg_out[0, :, :, :]
-        reg_out = reg_out.permute(1, 2, 0).contiguous().view(-1, 4) 
+        reg_out = reg_out.permute(1, 2, 0).contiguous().view(-1, 4)
         # reg_out -> (64 * 64 * k, 4)
 
         proposals, cls_out = self._anchors2proposals(reg_out, cls_out)
@@ -92,11 +89,11 @@ class RPN(nn.Module):
         bboxes = offset2bbox(proposals)
         bboxes = clip_boxes(bboxes, self.input_img_size)
 
-        probs_object = F.softmax(cls_out, dim=1)[:, 1] # it is 1 and not zero ! (TODO check this)
+        probs_object = F.softmax(cls_out, dim=1)[:, 1]  # it is 1 and not zero ! (TODO check this)
         # probs_object -> (batch_size, 64 * 64 * k)
-        
+
         # parece que o codigo original n filtra no treino.. so no teste..
-        cond = bboxes_filter_condition(bboxes) # should filter before softmax to consume less computational?
+        cond = bboxes_filter_condition(bboxes)  # should filter before softmax to consume less computational?
         bboxes, probs_object, labels_class = bboxes[cond, :], probs_object[cond], labels_class[cond]
         # bboxes -> (batch_size, -1, 4)
         # probs_object -> (batch_size, -1)
@@ -129,7 +126,6 @@ class RPN(nn.Module):
         ####################################
 
         return proposals, cls_out, filtered_proposals, probs_object, filtered_labels_class
-
 
     def _anchors2proposals(self, reg_out, cls_out):
         """
@@ -165,7 +161,6 @@ class RPN(nn.Module):
 
         return proposals, cls_out
 
-
     def _get_anchors(self):
 
         # print('pay attention with the order w,h or h,w')
@@ -174,11 +169,11 @@ class RPN(nn.Module):
         # print('Ta com -1 no h e w')
         # print('check all types and dims !')
         # print('TODO: tentar fazer com broadcast sem ter que gerar a matrix toda')
-        
+
         # 16 = anchor base
         # ah * aw = 16*16 = 256
         # ah / aw = r -> ah * 1/aw = r
-        # 
+        # #
         # ah = r * aw       (2)
         # r * aw * aw = 256
         # aw^2 = 256/r
@@ -192,8 +187,8 @@ class RPN(nn.Module):
         anchors = []
 
         for r in self.anchor_ratios:
-            
-            # An issue about this round: https://github.com/facebookresearch/Detectron/issues/227
+
+            # An issue about this round: https://github.com/facebookresearch/Detectron/issues/227  TODO
             anchor_n_cols = np.round(np.sqrt(base_anchor_area / r))
             anchor_n_rows = np.round(anchor_n_cols * r)
 
@@ -218,7 +213,7 @@ class RPN(nn.Module):
             ach = a[1] + 0.5 * (ah - 1)
 
             for s in self.anchor_scales:
-                
+
                 anchor_col_0 = acw - 0.5 * (aw * s - 1.0)
                 anchor_col_1 = acw + 0.5 * (aw * s - 1.0)
 
@@ -247,8 +242,8 @@ class RPN(nn.Module):
         all_anchors = np.zeros((n_anchors, self.feature_extractor_size[1], self.feature_extractor_size[0]), dtype=np.float32)
         for k in range(0, n_anchors, 4):
             for i in range(0, self.feature_extractor_size[1]):
-                for j in range(0, self.feature_extractor_size[0]): # Jesus! There was a silent but dangerous bug here! Fixed!
-                    all_anchors[k + 0, i, j] = anchors[k + 0] + j * self.receptive_field_size 
+                for j in range(0, self.feature_extractor_size[0]):  # Jesus! There was a silent but dangerous bug here! Fixed!
+                    all_anchors[k + 0, i, j] = anchors[k + 0] + j * self.receptive_field_size
                     all_anchors[k + 1, i, j] = anchors[k + 1] + i * self.receptive_field_size
                     all_anchors[k + 2, i, j] = anchors[k + 2]
                     all_anchors[k + 3, i, j] = anchors[k + 3]
@@ -283,4 +278,3 @@ class RPN(nn.Module):
         print('A total of {} valid anchors.'.format(anchors.size(0)))
 
         return anchors, valid_mask
-

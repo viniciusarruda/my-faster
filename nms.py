@@ -1,23 +1,22 @@
 import torch
 import torchvision
-import config
 
 # TODO: check if I need to check if x0 is greater than x1 e etc.. (the assertion)
 # TODO: keep the +1 standard or no? https://github.com/facebookresearch/Detectron/blob/master/detectron/utils/boxes.py#L23
 
 # accepts only bboxes.size() -> (#bboxes, 4) and probs_object.size() -> (#bboxes)
+
+
 def nms(bboxes, probs_object, nms_threshold):
 
-    # TODO I think I will leave this here.. 
-    # I want to check degenerate cases. 
+    # TODO I think I will leave this here..
+    # I want to check degenerate cases.
     # How shold I handle it? Get these cases out or leave it?
     # https://github.com/pytorch/vision/issues/1870
     # If this assertion is not here:
     #    The PyTorch implementation will leave the degenerate boxes. (in a natural way)
     #    In my implementation, the degenerate boxes will be removed.  (in a natural way)
     #    To imitate the PyTorch implementation behavior, it will have a greater computational cost.
-    assert torch.all(bboxes[:, 2] > bboxes[:, 0]) and torch.all(bboxes[:, 3] > bboxes[:, 1]) # just to ensure.. but this is dealt before I think... I am shure !!
-    # actually can be assert x1_0 >= x0_0 and y1_0 >= y0_0.. No, because can get 0 for union
 
     # testing if the two code outputs the same and its time
     # for while, its output are the identical also quite similar the time spent

@@ -1,13 +1,14 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-import numpy as np
 import torchvision
 
 # TODO: Implement my own RoIAlign from scratch using python (dont care if become slow, just as learning)
+
+
 class ROI(nn.Module):
 
-    def  __init__(self, input_img_size):
+    def __init__(self, input_img_size):
         super(ROI, self).__init__()
 
         self.out_dim = 7
@@ -19,7 +20,10 @@ class ROI(nn.Module):
         fx = features.size(2) / self.input_img_size[1]  # ja sei a priori
         fy = features.size(3) / self.input_img_size[0]  # ja sei a priori
 
-        assert fx == fy # 1.0/16.0
+        # print(features.size(2), self.input_img_size[1])
+        # print(features.size(3), self.input_img_size[0])
+        # print(fx, fy)
+        assert fx == fy  # 1.0/16.0
         # LOOK example usage.. but it is really shallow: https://github.com/jwyang/faster-rcnn.pytorch/blob/31ae20687b1b3486155809a57eeb376259a5f5d4/lib/model/roi_align/modules/roi_align.py#L18
 
         # TODO commentint out the above and setting spatial_scale to 1 shoud be equal, according to test_nms.py file
@@ -32,7 +36,7 @@ class ROI(nn.Module):
 
         rois = torchvision.ops.roi_align(features, [proposals], (14, 14), spatial_scale=fx)
 
-        rois = F.max_pool2d(rois, kernel_size=2) # there is avg_pool, others use stride=1
+        rois = F.max_pool2d(rois, kernel_size=2)  # there is avg_pool, others use stride=1
 
         return rois
 
@@ -40,7 +44,7 @@ class ROI(nn.Module):
 # class ROI(nn.Module):
 
 #     def  __init__(self, input_img_size):
-    
+
 #         super(ROI, self).__init__()
 
 #         self.out_dim = 7
@@ -83,12 +87,12 @@ class ROI(nn.Module):
 #                 h = roi[i, k, 3]
 
 #                 roi_feature = features[i, :, x:x+w, y:y+h].unsqueeze(0)
-                
+
 #                 roi_feature_interpolated = F.interpolate(roi_feature, size=(14, 14),  mode='bilinear', align_corners=True)
 
 #                 # Here, the max_pool2d is substituted for RCNN_top !
 #                 roi_pooled = F.max_pool2d(roi_feature_interpolated, kernel_size=2)
-                
+
 #                 rois.append(roi_pooled)
 
 #             rois = torch.cat(rois, dim=0)
@@ -98,7 +102,7 @@ class ROI(nn.Module):
 
 #         return rois
 
- # NAO DESISTE !!!
+# NAO DESISTE !!!
 
 
 if __name__ == "__main__":
@@ -115,16 +119,15 @@ if __name__ == "__main__":
 
     print(out)
 
-
     # MY TRY:
     # print(single_roi.size())
 
-    x = single_roi[:, 0] * 1.0 # fx
-    y = single_roi[:, 1] * 1.0 # fy
-    w = single_roi[:, 2] * 1.0 # fx
-    h = single_roi[:, 3] * 1.0 # fy
+    x = single_roi[:, 0] * 1.0  # fx
+    y = single_roi[:, 1] * 1.0  # fy
+    w = single_roi[:, 2] * 1.0  # fx
+    h = single_roi[:, 3] * 1.0  # fy
 
-    roi = torch.stack((x.floor(), y.floor(), w.ceil(), h.ceil()), dim=1).long() # long -> torch.int64
+    roi = torch.stack((x.floor(), y.floor(), w.ceil(), h.ceil()), dim=1).long()  # long -> torch.int64
 
     # print(roi.size())
 
@@ -133,13 +136,12 @@ if __name__ == "__main__":
     w = roi[0, 2]
     h = roi[0, 3]
 
-    roi_feature = features[0, :, x:x+w, y:y+h].unsqueeze(0)
+    roi_feature = features[0, :, x:x + w, y:y + h].unsqueeze(0)
 
     # print(roi_feature.size())
-        
-    roi_feature_interpolated = F.interpolate(roi_feature, size=(5, 5),  mode='bilinear', align_corners=True)
+
+    roi_feature_interpolated = F.interpolate(roi_feature, size=(5, 5), mode='bilinear', align_corners=True)
 
     # print(roi_feature_interpolated.size())
-    
+
     print(roi_feature_interpolated)
-      

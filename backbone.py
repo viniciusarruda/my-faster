@@ -40,6 +40,10 @@ class ResNetBackbone(nn.Module):
             full_model = models.resnet50(pretrained=True)
             self.out_dim = 1024
             top_out_channels = 2048
+        elif n_layers == 101:
+            full_model = models.resnet101(pretrained=True)
+            self.out_dim = 1024
+            top_out_channels = 2048
         else:
             raise NotImplementedError('{} is not implemented!'.format(config.backbone))
 

@@ -8,6 +8,7 @@ arg_parser.add_argument('--img_folder', required=True, type=str)
 arg_parser.add_argument('--csv_in', required=True, type=str)
 arg_parser.add_argument('--csv_out', required=True, type=str)
 arg_parser.add_argument('--number_of_imgs', required=True, type=int)
+arg_parser.add_argument('--class_name', required=True, type=str)
 args = arg_parser.parse_args()
 
 with open(args.csv_in, 'r') as f:
@@ -36,7 +37,8 @@ for k in keys:
         y1 = bboxes[4]
         class_name = bboxes[5]
 
-        data.append('{},{},{},{},{},{}'.format(filename, x0, y0, x1, y1, class_name))
+        if args.class_name == class_name:
+            data.append('{},{},{},{},{},{}'.format(filename, x0, y0, x1, y1, class_name))
 
 with open(args.csv_out, 'w') as f:
     f.write('\n'.join(data))

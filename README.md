@@ -109,13 +109,20 @@
     - [x] Check if already makes a copy (R: If not on cpu it copies, else does not)
     - [x] Check what is the behavior if is already on cpu()
     - [x] Check if there is an elegant alternative. (R: I didnt find)
+- [x] Compare with the any implementation if it has bboxes out of the image.
+- [ ] Imprimir total loss tbm
+- [ ] Standardize variables:
+    - bbox format:   always x0, y0, x1, y1   with name: var_name_bf
+    - offset format: always cw, ch, w, h     with name: var_name_of
+- [ ] Check why am I loosing so much annotations due to lack of positive assigned anchors. Is it really right?
+ - start from here !
 - [ ] Check the necessity to assign 0 score to bboxes removed after NMS. acho que eh so pra sair as inferencias com bbox prob 0.. nas hora de calcular o map e tal
-- [ ] Implement ResNet50
-- [ ] Implement ResNet101
+- [x] Implement ResNet50
+- [x] Implement ResNet101
 - [ ] Overfit some data.. check instability.. if persist, compare the overfiting against another Faster R-CNN implementation
+ - USE THIS AS A BASELINE WHILE DEBUGGING YOUR IMPLEMENTATION!
 - [ ] Check if the DataLoader is really efficient, if so, put the data pre-processing inside the getitem() - it will make the code simpler and to adapt to any image size easier. 
 ---------- Well done! Keep going! --------------
-- [ ] Add ResNet101 (currently is ResNet18)
 - [ ] Document as in https://realpython.com/documenting-python-code/
 ---------- Well done! Keep going! --------------
 - [ ] invalid anchors can be setted to -1 on labels ? (as dont care..)

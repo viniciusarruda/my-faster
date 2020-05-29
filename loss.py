@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from bbox_utils import offset2bbox, anchors_offset2bbox, compute_iou
+from bbox_utils import anchors_bbox2offset, compute_iou
 import config
 
 
@@ -17,190 +17,110 @@ def smooth_l1(x, sigma=3.0):
     false_cond = x_abs - (0.5 / sigma2)
 
     ret = torch.where(cond, true_cond, false_cond)
-    ret = torch.sum(ret)
+
+    # ret = torch.sum(ret) -> Other implementatios are getting the mean, not the sum!
+    ret = torch.mean(ret)
 
     return ret
 
 
 # TODO: This function is only called when generating the dataset!?
 #       if so, change the location to other file as is didn't belong here.
-# TODO: what would happen if everything below positive threshold is set to zero ? (not object)
-#       maybe the work of the cls_reg could be less painful ? to think deeply
-#       the function of cls_reg dos not seems to only to improve and get the classes of the bbox
-#       but to help a lot the RPN! Think hard about this..
-def anchor_labels(anchors, gts, class_idxs, negative_threshold=0.3, positive_threshold=0.7):
+def anchor_labels(anchors, annotations, negative_threshold=0.3, positive_threshold=0.7):
 
-    anchors_bbox = anchors_offset2bbox(anchors)
+    # The anchors are associated independently of the bbox regression or classification
 
-    ious = compute_iou(gts, anchors_bbox, anchors)
+    ious = compute_iou(annotations, anchors)
 
-    mask = torch.zeros(gts.size(0), anchors.size(0), dtype=torch.int64)
-    mask_class = torch.zeros(anchors.size(0), dtype=torch.int64)
+    # RPN labels. Initializing with all anchors as don't care (i.e., -1)
+    rpn_labels = torch.empty(anchors.size(0), dtype=torch.int64).fill_(-1)
 
-    # Set positive anchors
-    idxs = ious > positive_threshold
+    max_iou_anchors, argmax_iou_anchors = torch.max(ious, dim=0)
+    max_iou_gt, _ = torch.max(ious, dim=1)
 
-    # It is possible that a certain anchor is positive assigned to more than one box.
-    # So to handle this issue, this snippet makes the anchor belong only to the box with maximum IoU.
-    # Also, it is possible that one box has more than one positive assigned anchor
-    # The max IoU is obtained, generating a mask with it:
-    argmax_iou = torch.argmax(ious, dim=0)
-    max_iou_intersection = torch.zeros(gts.size(0), anchors.size(0), dtype=torch.bool)
-    max_iou_intersection[argmax_iou, range(argmax_iou.size(0))] = True
+    # Set background anchors first
+    # If the max iou for a given anchor is below the negative_threshold, hence all its ious
+    # no matter with which gt, will be below the negative_threshold
+    rpn_labels[max_iou_anchors < negative_threshold] = 0
 
-    idxs = idxs & max_iou_intersection   # &= is more efficient? - also tem como simplificar o calculo do idxs final
+    # Eq: Find the pair (bbox, anchor) which has the higher iou (doing this way to consider equal ious)
+    # e.g., scale 0.5 with an anchor totally inside the bbox: 2 anchors for this bbox with same iou.
+    # e.g., bbox inside an anchor, the other ratios of this anchor (i.e., with same area) that also
+    # wraps the bbox will result in a same iou;
+    # Any: Reduce the big match table to values deciding which anchor is foreground
+    match = torch.any(torch.eq(ious, max_iou_gt.view(-1, 1)), dim=0)
 
-    # It is possible that a certain box has no positive anchor assigned. This snippet handles this issue.
-    # First, a mask with the available anchors is built.
-    # Remember, they are available because iou < positive_threshold,
-    # and yet they can be used, trying to not leave any box without an assigned anchor.
-    cond = torch.ones(gts.size(0), anchors.size(0), dtype=torch.bool)
-    cond[:, idxs.nonzero()[:, 1]] = False  # Removes the already assigned anchors.
-    cond[idxs.nonzero()[:, 0], :] = False  # Removes the box which already has an assigned anchor.
+    # Set foreground anchors
+    # If there is an anchor with iou with any bbox which is above the threshold, then mark as foreground
+    rpn_labels[match | (max_iou_anchors > positive_threshold)] = 1
 
-    # Finally, the final mask is composed.
-    # Only the argmax IoU that was not already assigned that can be used to assign the remaining boxes.
-    assert (idxs & (max_iou_intersection & cond)).sum() == 0
-    idxs = idxs | (max_iou_intersection & cond)  # always mutual exclusive due to `cond`, i.e., (idxs & (max_iou_intersection & cond)).sum() is always zero.
+    # Expand the annotations to match the anchors shape
+    # The background anchors (note: different thinking from rpn_labels!) are marked with
+    # all zeros (including its class which already means background)
+    expanded_annotations = torch.zeros(anchors.size(0), 5, dtype=annotations.dtype)
+    # Taking care of only considering as foreground anchors the ones with iou > 0
+    # Again, the strategy here is different from when generating the rpn_labels
+    idxs = max_iou_anchors > 0.0
+    assert idxs.sum() != 0  # so pq eu quero saber quando vai cair nesse caso para saber o comportamento .. acho praticamente impossivel
+    expanded_annotations[idxs, :] = annotations[argmax_iou_anchors[idxs], :]
 
-    # Here, idxs tries to assign at least one positive anchor to each box.
-    # There is no anchor belonging to more than one box!
-    # It is possible that a certain box doesn't have an assigned anchor because,
-    # and only because, the anchor which it has the higher IoU it was already assigned to another box with an even higher IoU, and
-    # it makes no sense to assign another unused anchor with a lower IoU because the algorithm may be "confused", i.e., resulting in an unstable training.
-    # The correct way to handle this, is to have more anchors, i.e., adding more anchors ratios and scales.
+    return rpn_labels, expanded_annotations, argmax_iou_anchors[idxs] # this last is just to show (debug)
 
-    # Finally the mask is applied
-    mask[idxs] = 1
+#inspect this when multiclass
+def get_target_mask(rpn_filtered_proposals, annotations, low_threshold=0.1, high_threshold=0.5):
 
-    # Set negative anchors
-    # If a box receive a positive assigned anchor with iou < positive_threshould it is ok
-    # but, if iou < negative threshould, it will be canceled, since it is a really low intersection
-    # also, it is possible that a iou=0 exists and the code above (with the max) will allow to be positive assigned if it is not already assigned
-    # so this will avoid this cases too since iou=0 < negative_threshold
-    idxs = ious < negative_threshold
-    mask[idxs] = -1
+    # Add the bbox annotations into the proposals
+    # IMO, the only purpose of this is to avoid empty proposals
+    all_proposals = torch.cat((rpn_filtered_proposals, annotations[:, :-1]), dim=0)
 
-    # Get a table in the following format: [box_idx, anchor_idx] relating the box with its respective positive assigned anchor
-    table_gts_positive_anchors = (mask == 1).nonzero()
+    ious = compute_iou(annotations, all_proposals)
+    max_iou_gt, argmax_iou_gt = torch.max(ious, dim=0)
 
-    # Get a mask with anchors which are positive, don't care or negative.
-    mask_objectness, _ = torch.max(mask, dim=0)
+    # ----------- Select foreground idxs ----------- #
+    max_fg_idxs = int(config.fg_fraction * config.batch_size)
 
-    # Reverse the standard to later facilitate the use
-    # It was: middle (don't care) -> 0, negative -> -1 and positive -> 1
-    # And now: middle (don't care) -> -1, negative -> 0 and positive -> 1
-    idxs_middle = mask_objectness == 0
-    idxs_negative = mask_objectness == -1
+    # (using the max_iou to simplify as the results will be the same)
+    fg_idxs = (max_iou_gt >= high_threshold).nonzero().squeeze(1)
+    n_fg_idxs = fg_idxs.size(0)
 
-    mask_objectness[idxs_middle] = -1
-    mask_objectness[idxs_negative] = 0
+    # Select up to max_fg_idxs foreground proposals
+    if n_fg_idxs > max_fg_idxs:
+        keep_idxs = torch.randperm(n_fg_idxs, device=annotations.device)[:n_fg_idxs - max_fg_idxs]
+        fg_idxs = fg_idxs[keep_idxs]
+        n_fg_idxs = max_fg_idxs
+    # ---------------------------------------------- #
 
-    mask_class[table_gts_positive_anchors[:, 1]] = class_idxs[table_gts_positive_anchors[:, 0]]
+    # -------- Select hard background idxs --------- #
+    # The easy backgroud cases (i.e., max_iou_gt < low_threshold) are ignored
+    max_bg_idxs = config.batch_size - n_fg_idxs
 
-    return mask_objectness, mask_class, table_gts_positive_anchors
+    # (using the max_iou to simplify as the results will be the same)
+    bg_idxs = ((low_threshold >= max_iou_gt) & (max_iou_gt < high_threshold)).nonzero().squeeze(1)
+    n_bg_idxs = bg_idxs.size(0)
 
-
-def get_target_mask(rpn_filtered_proposals, gts, clss_idxs, rpn_filtered_labels_class, low_threshold=0.1, high_threshold=0.5):
-
-    # here I have to get a clone of the labels class ? or not because it was already filtered? i think the same is for the labes_objectness
-    # por via das duvidas fazer o clone, quando for pra otimizar mexo nisso.
-
-    all_proposals = torch.cat((rpn_filtered_proposals, gts), dim=0)
-    all_labels_class = torch.cat((rpn_filtered_labels_class, clss_idxs), dim=0)
-    # all_proposals = rpn_filtered_proposals
-    # all_labels_class = rpn_filtered_labels_class
-
-    rpn_filtered_bbox = offset2bbox(all_proposals)
-
-    ious = compute_iou(gts, rpn_filtered_bbox, all_proposals)
-
-    # print(rpn_filtered_bbox.size())
-    # print(rpn_filtered_labels_class.size())
-    # print(ious.size())
-
-    batch_size = gts.size(0)
-    cls_mask = torch.zeros(batch_size, all_proposals.size(0), dtype=torch.int64, device=gts.device)
-
-    # Set easy background cases as don't care
-    idxs = ious < low_threshold
-    cls_mask[idxs] = -1
-
-    # Set foreground cases
-    idxs = ious > high_threshold
-
-    # It is possible that a certain proposal is positive assigned to more than one box.
-    # So to handle this issue, this snippet makes the proposal belong only to the box with maximum IoU.
-    idxs_cond = torch.argmax(ious, dim=0)
-    cond = torch.zeros(batch_size, all_proposals.size(0), dtype=torch.bool, device=idxs.device)
-    cond[idxs_cond, range(idxs_cond.size(0))] = True
-    idxs = idxs & cond
-
-    # It is possible that a certain box has no positive proposal assigned.
-    # But, unlike the anchor_labels() function,
-    # (CHECKED with original implementation) I think that I should leave these boxes without a proposal assigned,
-    # because when the RPN adjust these proposals, this function will consider as positive organically.
-
-    # Finally the mask is applied
-    cls_mask[idxs] = 1
-
-    # idx_gt, idx_positive_proposal
-    # NOTE: The bbox regession will not be balanced as the cls_mask will
-    table_fgs_positive_proposals = (cls_mask == 1).nonzero()
-
-    # Do not needed to reverse like the anchor_label()
-    cls_mask, _ = torch.max(cls_mask, dim=0)
-
-    cls_mask[table_fgs_positive_proposals[:, 1]] = all_labels_class[table_fgs_positive_proposals[:, 1]]
-
-    table_fgs_positive_proposals = torch.cat((table_fgs_positive_proposals,
-                                              all_labels_class[table_fgs_positive_proposals[:, 1]].unsqueeze(1)), dim=1)
-    non_background_idxs = table_fgs_positive_proposals[:, 2] != 0
-    table_fgs_positive_proposals = table_fgs_positive_proposals[non_background_idxs]
-    table_fgs_positive_proposals[:, 2] -= 1  # fixing the classes - removing the background because it is not predicted, just ignored
-
-    assert (cls_mask[table_fgs_positive_proposals[:, 1]] == 0).sum() == 0  # if fails something is wrong
-    assert (table_fgs_positive_proposals[:, 2] < 0).sum() == 0  # if fails something is wrong
-
-    # A ORDEM DESSE CODIGO EH CRUCIAL.. DPS TEM QUE COMENTAR PARA N FICAR ESQUECENDO TODA HORA O QUE FAZ O QUE
-
-    # --- Following is the code to balance the batch --- #
-
-    n_fg_proposals = table_fgs_positive_proposals.size(0)  # It is correct to be here!
-
-    # TODO
-    # NOTE: The snippet below is identical to the one at the dataset_loader.py.. maybe should make a function with it
-
-    max_fg_proposals = int(config.fg_fraction * config.batch_size)
-
-    # Select up to max_fg_proposals foreground proposals
-    # The excess is marked as don't care
-    if n_fg_proposals > max_fg_proposals:
-        fg_proposals_idxs = table_fgs_positive_proposals[:, 1]
-        tmp_idxs = torch.randperm(n_fg_proposals, device=gts.device)[:n_fg_proposals - max_fg_proposals]
-        idxs_to_suppress = fg_proposals_idxs[tmp_idxs]
-        cls_mask[idxs_to_suppress] = -1  # mark them as don't care
-        n_fg_proposals = max_fg_proposals
-
-    # Fill the remaining batch with bg proposals
-    # Annalyze if the `if` below has low rate of entrance.. if so, put the below line inside it to optimize
-    bg_proposals_idxs = (cls_mask == 0).nonzero().squeeze(1)
-    n_bg_proposals = bg_proposals_idxs.size(0)
-    n_proposals_to_complete_batch = config.batch_size - n_fg_proposals
-
-    if n_bg_proposals > n_proposals_to_complete_batch:
+    if n_bg_idxs > max_bg_idxs:
         # Sample the bg_proposals to fill the remaining batch space
-        tmp_idxs = torch.randperm(n_bg_proposals, device=gts.device)[:n_bg_proposals - n_proposals_to_complete_batch]
-        idxs_to_suppress = bg_proposals_idxs[tmp_idxs]
-        cls_mask[idxs_to_suppress] = -1  # mark them as don't care
-    # else, just use the available ones, which is the default behavior
+        keep_idxs = torch.randperm(n_bg_idxs, device=annotations.device)[:n_bg_idxs - max_bg_idxs]
+        bg_idxs = bg_idxs[keep_idxs]
+        n_bg_idxs = max_bg_idxs
+    # ---------------------------------------------- #
 
-    # print((cls_mask == -1).sum(), (cls_mask == 0).sum(), (cls_mask >= 1).sum())
-    # print('------------------')
+    # Concatenate all foreground and hard background indexes
+    keep_idxs = torch.cat((fg_idxs, bg_idxs), dim=0)
 
-    return table_fgs_positive_proposals, cls_mask, all_proposals
+    # In contrast to RPN, here we also sample the target_bboxes
+    # Remember: annotations have the classes attached in last dim
+    expanded_annotations = annotations[argmax_iou_gt[keep_idxs], :]
 
+    # Set the bg_idxs annotation labels to background class
+    expanded_annotations[n_fg_idxs:, -1] = 0
 
+    # Also filter the proposals, to lately match the target annotations in the loss
+    proposals = all_proposals[keep_idxs, :]
+
+    return expanded_annotations, proposals
+
+#da pra passar o idx acomo parametro e colocar no lugar do : ao ives de fazer a mascara no get_target_distance
 def _parametrize_bbox(bbox, a_bbox):
 
     assert bbox.size() == a_bbox.size()
@@ -213,13 +133,18 @@ def _parametrize_bbox(bbox, a_bbox):
     th = torch.log(h / ha)
     return tx, ty, tw, th
 
+# rpn_bbox_loss = get_target_distance(proposals, self.rpn_net.valid_anchors, annotations[:, :-1], expanded_annotations)
+def get_target_distance(proposals, valid_anchors, expanded_annotations):
 
-def get_target_distance(proposals, anchors, gts, table_gts_positive_anchors):
+    # Select only non-background bboxes (the background annotations are all zeros, i.e., padding)
+    keep = expanded_annotations[:, -1] > 0
 
-    gts_idxs, anchors_idxs = table_gts_positive_anchors[:, 0], table_gts_positive_anchors[:, 1]
+    proposals = anchors_bbox2offset(proposals[keep, :])
+    anchors = anchors_bbox2offset(valid_anchors[keep, :])
+    gts = anchors_bbox2offset(expanded_annotations[keep, :-1])
 
-    txgt, tygt, twgt, thgt = _parametrize_bbox(gts[gts_idxs, :], anchors[anchors_idxs, :])
-    txp, typ, twp, thp = _parametrize_bbox(proposals[anchors_idxs, :], anchors[anchors_idxs, :])
+    txgt, tygt, twgt, thgt = _parametrize_bbox(gts, anchors)
+    txp, typ, twp, thp = _parametrize_bbox(proposals, anchors)
 
     assert txp.size() == txgt.size()
 
@@ -228,62 +153,37 @@ def get_target_distance(proposals, anchors, gts, table_gts_positive_anchors):
         smooth_l1(twp - twgt, sigma=3) + \
         smooth_l1(thp - thgt, sigma=3)
 
-    # without normalization to simplify as said in the paper
-    return sum_reg  # / d
+    # without normalization to simplify as said in the paper  -> found that it is normalized on other implementations
+    return sum_reg / 4.0
 
 
-def get_target_distance2(raw_reg, rpn_filtered_proposals, gts, table_fgs_positive_proposals):
+def get_target_distance2(raw_reg, rpn_filtered_proposals, proposal_annotations):
 
-    # TODO ainda n to filtrando backgroud
-    # print('---')
     # print(raw_reg.size())
-    # print(raw_reg.view(raw_reg.size(0), -1, 4).size())
-    # print(raw_reg.view(raw_reg.size(0), -1, 4)[:, table_fgs_positive_proposals[:, 2], :].size())
-    # print()
-    # print(rpn_filtered_proposals)
     # print(rpn_filtered_proposals.size())
-    # print()
-    # print(gts)
-    # print(gts.size()) #continue from here.. after modification check the diference of the saved
-    # print()
-    # print(table_fgs_positive_proposals)
-    # print(table_fgs_positive_proposals.size())
-    # print('---')
-    # gts_idxs, proposals_idxs = table_fgs_positive_proposals[:, 0], table_fgs_positive_proposals[:, 1]
-    # print(gts[gts_idxs, :])
-    # print()
-    # print(rpn_filtered_proposals[proposals_idxs, :])
-    # print('===')
-    # print(raw_reg)
-    # raw_reg = raw_reg.view(raw_reg.size(0), -1, 4)
-    # txp = raw_reg[proposals_idxs, table_fgs_positive_proposals[:, 2], 0]
-    # print(txp)
-    # print(table_fgs_positive_proposals)
-    # print(gts_idxs)
-    # print(proposals_idxs)
-    # print(table_fgs_positive_proposals[:, 2])
-    # print('===')
-    # exit()
+    # print(proposal_annotations.size())
+    # # inspect this. raw_reg will change with multiclass
+    # print('111')
+    
+    fg_idxs = proposal_annotations[:, -1] > 0
 
-    # cls_idx = 0 na tabela fgs
+    rpn_filtered_proposals = anchors_bbox2offset(rpn_filtered_proposals[fg_idxs, :])
+    target_bboxes = anchors_bbox2offset(proposal_annotations[fg_idxs, :-1])
+    # -1 Because I did not include the prediction of background bboxes:
+    target_classes = proposal_annotations[fg_idxs, -1].long() - 1
 
-    # raw_reg = raw_reg.view(raw_reg.size(0), -1, 4)
-    # raw_reg = raw_reg[:, idxs_from_table, :]
 
-    gts_idxs, proposals_idxs = table_fgs_positive_proposals[:, 0], table_fgs_positive_proposals[:, 1]
+    # remove the zeros bboxes
+    # agora vou ter que filtrar tbm os outros.. sera que n eh melhor deixar 
+    # o background, e predizer ele como zero?
 
-    txgt, tygt, twgt, thgt = _parametrize_bbox(gts[gts_idxs, :], rpn_filtered_proposals[proposals_idxs, :])
+    txgt, tygt, twgt, thgt = _parametrize_bbox(target_bboxes, rpn_filtered_proposals)
 
     raw_reg = raw_reg.view(raw_reg.size(0), -1, 4)
-    txp = raw_reg[proposals_idxs, table_fgs_positive_proposals[:, 2], 0]
-    typ = raw_reg[proposals_idxs, table_fgs_positive_proposals[:, 2], 1]
-    twp = raw_reg[proposals_idxs, table_fgs_positive_proposals[:, 2], 2]
-    thp = raw_reg[proposals_idxs, table_fgs_positive_proposals[:, 2], 3]
-
-    # txp = raw_reg[proposals_idxs, 0]
-    # typ = raw_reg[proposals_idxs, 1]
-    # twp = raw_reg[proposals_idxs, 2]
-    # thp = raw_reg[proposals_idxs, 3]
+    txp = raw_reg[fg_idxs, target_classes, 0]
+    typ = raw_reg[fg_idxs, target_classes, 1]
+    twp = raw_reg[fg_idxs, target_classes, 2]
+    thp = raw_reg[fg_idxs, target_classes, 3]
 
     assert txp.size() == txgt.size()
 
@@ -292,9 +192,9 @@ def get_target_distance2(raw_reg, rpn_filtered_proposals, gts, table_fgs_positiv
         smooth_l1(twp - twgt, sigma=3) + \
         smooth_l1(thp - thgt, sigma=3)
 
-    # without normalization to simplify as said in the paper
+    # without normalization to simplify as said in the paper  -> found that it is normalized on other implementations
 
-    return sum_reg  # / d
+    return sum_reg / 4.0
 
 
 def compute_prob_loss(probs_object, labels):
@@ -305,9 +205,11 @@ def compute_prob_loss(probs_object, labels):
 
     # ignore_index=-1: considering all cares ! Just positive and negative (or backgrounds and cars if is cls_reg loss) samples !
 
-    prob_loss = F.cross_entropy(probs_object, labels, reduction='sum', ignore_index=-1)
+    # prob_loss = F.cross_entropy(probs_object, labels, reduction='sum', ignore_index=-1)
 
-    return prob_loss  # / d
+    prob_loss = F.cross_entropy(probs_object, labels, reduction='mean', ignore_index=-1)
+
+    return prob_loss
 
 
 # NAO DESISTE !!!!!!!!!!!!!!!!!

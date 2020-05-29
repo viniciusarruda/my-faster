@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 import numpy as np
 from nms import nms
-from bbox_utils import bbox2offset, offset2bbox, clip_boxes, bboxes_filter_condition
+from bbox_utils import clip_boxes, anchors_offset2bbox, anchors_bbox2offset
 import config
 
 
@@ -24,9 +24,10 @@ class RPN(nn.Module):
         self.anchor_ratios = config.rpn_anchor_ratios
         self.anchor_scales = config.rpn_anchor_scales
         self.k = len(self.anchor_scales) * len(self.anchor_ratios)
-        anchors, valid_anchors_mask = self._get_anchors()
-        self.register_buffer('anchors', anchors)
+        all_anchors, valid_anchors_mask = self._get_anchors()   # mudar para all_anchors, valid_anchors_mask e valid_anchors
+        self.register_buffer('all_anchors', all_anchors)
         self.register_buffer('valid_anchors_mask', valid_anchors_mask)
+        self.register_buffer('valid_anchors', all_anchors[valid_anchors_mask, :])
         # self.anchors, self.valid_anchors_mask = self.anchors.to(device), self.valid_anchors_mask.to(device)
         #################################
 
@@ -35,7 +36,7 @@ class RPN(nn.Module):
         self.cls_layer = nn.Conv2d(in_channels=512, out_channels=self.k * 2, kernel_size=1, stride=1, padding=0)
         self.reg_layer = nn.Conv2d(in_channels=512, out_channels=self.k * 4, kernel_size=1, stride=1, padding=0)
 
-    def forward(self, x, labels_class):
+    def forward(self, x, pre_nms_top_n, pos_nms_top_n):
         assert x.size(0) == 1  # remove this assertion later..
         # x -> (batch_size, feature_extractor_out_dim, 64, 64)
 
@@ -78,56 +79,61 @@ class RPN(nn.Module):
         reg_out = reg_out.permute(1, 2, 0).contiguous().view(-1, 4)
         # reg_out -> (64 * 64 * k, 4)
 
-        proposals, cls_out = self._anchors2proposals(reg_out, cls_out)
-        # proposals -> (#valid_anchors, 4)
-        # cls_out   -> (#valid_anchors, 2)
+        proposals = self._anchors2proposals(reg_out)
+        # proposals -> (#anchors, 4)
+        # cls_out   -> (#anchors, 2)
         ####################################
 
         # TODO This second part should not be here.. instead.. is more a faster rcnn stuff than rpn one
         ####################################
 
-        bboxes = offset2bbox(proposals)
-        bboxes = clip_boxes(bboxes, self.input_img_size)
+        bboxes = clip_boxes(proposals, self.input_img_size)
 
         probs_object = F.softmax(cls_out, dim=1)[:, 1]  # it is 1 and not zero ! (TODO check this)
         # probs_object -> (batch_size, 64 * 64 * k)
 
-        # parece que o codigo original n filtra no treino.. so no teste..
-        cond = bboxes_filter_condition(bboxes)  # should filter before softmax to consume less computational?
-        bboxes, probs_object, labels_class = bboxes[cond, :], probs_object[cond], labels_class[cond]
+        # Filter small bboxes (not implemented in that famous pytorch version)
+        # cond = bboxes_filter_condition(bboxes)
+        # bboxes, probs_object, labels_class = bboxes[cond, :], probs_object[cond], labels_class[cond]
         # bboxes -> (batch_size, -1, 4)
         # probs_object -> (batch_size, -1)
 
         # Filter the top pre_nms_top_n bboxes
         idxs = torch.argsort(probs_object, descending=True)
-        n_bboxes = config.pre_nms_top_n
+        n_bboxes = pre_nms_top_n
+
         if n_bboxes > 0:
             idxs = idxs[:n_bboxes]
 
-        # apply nms
-        idxs_kept = nms(bboxes[idxs, :], probs_object[idxs], nms_threshold=config.nms_threshold)
+        idxs_kept = nms(bboxes[idxs, :], probs_object[idxs], nms_threshold=0.7)
         idxs = idxs[idxs_kept]
 
         # Filter the top pos_nms_top_n bboxes
-        n_bboxes = config.pos_nms_top_n
+        n_bboxes = pos_nms_top_n
         if n_bboxes > 0:
             # already sorted by score due to `keep` indexing
             idxs = idxs[:n_bboxes]
 
-        filtered_bboxes = bboxes[idxs, :]
+        filtered_proposals = bboxes[idxs, :]
         probs_object = probs_object[idxs]
-        filtered_labels_class = labels_class[idxs]
         # bboxes -> (batch_size, -1, 4)
         # probs_object -> (batch_size, -1)
 
-        filtered_proposals = bbox2offset(filtered_bboxes)
-        # filtered_proposals -> (batch_size, -1, 4)
+        # In other codes after the pos_nms_top existis
+        # a padding with zeros. I think it exists to avoid
+        # empty tensor which may cause an error in the future.
+        # Or, to serve as background cases? I do not know.
+        # If this assertion fails, I need to inspect.
+        assert probs_object.size(0) > 0, 'Inspect the following code behavior when this happens.'
 
         ####################################
 
-        return proposals, cls_out, filtered_proposals, probs_object, filtered_labels_class
+        proposals = proposals[self.valid_anchors_mask, :]
+        cls_out = cls_out[self.valid_anchors_mask, :]
 
-    def _anchors2proposals(self, reg_out, cls_out):
+        return proposals, cls_out, filtered_proposals, probs_object
+
+    def _anchors2proposals(self, reg_out):
         """
         anchors: (N, 4) ndarray of float : anchors
         reg_out: (self.k, 4) ndarray of float
@@ -140,26 +146,28 @@ class RPN(nn.Module):
 
         """
 
-        cls_out = cls_out[self.valid_anchors_mask, :]
+        anchors = anchors_bbox2offset(self.all_anchors)
 
-        ax = self.anchors[:, 0]
-        ay = self.anchors[:, 1]
-        aw = self.anchors[:, 2]
-        ah = self.anchors[:, 3]
+        ax = anchors[:, 0]
+        ay = anchors[:, 1]
+        aw = anchors[:, 2]
+        ah = anchors[:, 3]
 
-        tx = reg_out[self.valid_anchors_mask, 0]
-        ty = reg_out[self.valid_anchors_mask, 1]
-        tw = reg_out[self.valid_anchors_mask, 2]
-        th = reg_out[self.valid_anchors_mask, 3]
+        tx = reg_out[:, 0]
+        ty = reg_out[:, 1]
+        tw = reg_out[:, 2]
+        th = reg_out[:, 3]
 
-        px = ax + aw * tx
-        py = ay + ah * ty
-        pw = aw * torch.exp(tw)
-        ph = ah * torch.exp(th)
+        px = ax + aw * tx         # cw
+        py = ay + ah * ty         # ch
+        pw = aw * torch.exp(tw)   # w
+        ph = ah * torch.exp(th)   # h
 
         proposals = torch.stack((px, py, pw, ph), dim=1)
 
-        return proposals, cls_out
+        proposals = anchors_offset2bbox(proposals)
+
+        return proposals
 
     def _get_anchors(self):
 
@@ -180,9 +188,10 @@ class RPN(nn.Module):
         # aw = sqrt(256/r)  (1)
         # ou seja, encontrar ah e aw para que mude o aspect ratio porem nao mude a area coberta pela ancora !
 
+        # The base anchor is: [0, 0, self.receptive_field_size - 1, self.receptive_field_size - 1]
         base_anchor_area = self.receptive_field_size * self.receptive_field_size
-        base_anchor_center_cols = 0.5 * self.receptive_field_size
-        base_anchor_center_rows = 0.5 * self.receptive_field_size
+        base_anchor_center_cols = (self.receptive_field_size - 1.0) * 0.5
+        base_anchor_center_rows = (self.receptive_field_size - 1.0) * 0.5
 
         anchors = []
 
@@ -213,7 +222,6 @@ class RPN(nn.Module):
             ach = a[1] + 0.5 * (ah - 1)
 
             for s in self.anchor_scales:
-
                 anchor_col_0 = acw - 0.5 * (aw * s - 1.0)
                 anchor_col_1 = acw + 0.5 * (aw * s - 1.0)
 
@@ -240,6 +248,7 @@ class RPN(nn.Module):
 
         n_anchors = 4 * len(self.anchor_ratios) * len(self.anchor_scales)
         all_anchors = np.zeros((n_anchors, self.feature_extractor_size[1], self.feature_extractor_size[0]), dtype=np.float32)
+
         for k in range(0, n_anchors, 4):
             for i in range(0, self.feature_extractor_size[1]):
                 for j in range(0, self.feature_extractor_size[0]):  # Jesus! There was a silent but dangerous bug here! Fixed!
@@ -251,30 +260,12 @@ class RPN(nn.Module):
         anchors = torch.from_numpy(all_anchors)
         anchors = anchors.permute(1, 2, 0).reshape(-1, 4)
 
-        valid_mask = np.zeros(anchors.size(0), dtype=np.uint8)
-        for i in range(anchors.size(0)):
+        anchors = anchors_offset2bbox(anchors)
 
-            acw = anchors[i, 0]
-            ach = anchors[i, 1]
-            aw = anchors[i, 2]
-            ah = anchors[i, 3]
-
-            a0 = acw - 0.5 * (aw - 1.0)
-            a1 = ach - 0.5 * (ah - 1.0)
-            a2 = aw + a0 - 1.0
-            a3 = ah + a1 - 1.0
-
-            # This was the implemented by me:
-            # if a0 >= 0 and a1 >= 0 and a2 <= self.input_img_size[0] - 1 and a3 <= self.input_img_size[1] - 1:
-            # I read the original faster code, and it was implemented like this:
-            # It sugests that is not considered the pixel space but a continuous space instead.
-            if a0 >= 0 and a1 >= 0 and a2 < self.input_img_size[0] and a3 < self.input_img_size[1]:
-                valid_mask[i] = 1
-
-        valid_mask = torch.from_numpy(valid_mask).to(torch.bool)
+        valid_mask = (anchors[:, 0] >= 0) & (anchors[:, 1] >= 0) & (anchors[:, 2] < self.input_img_size[0]) & (anchors[:, 3] < self.input_img_size[1])
 
         print('A total of {} anchors.'.format(anchors.size(0)))
-        anchors = anchors[valid_mask, :]
-        print('A total of {} valid anchors.'.format(anchors.size(0)))
+        # anchors = anchors[valid_mask, :]
+        print('A total of {} valid anchors.'.format(valid_mask.nonzero().size(0)))
 
         return anchors, valid_mask

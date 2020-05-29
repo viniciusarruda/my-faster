@@ -85,10 +85,10 @@ class Viz:
             # print("Clss '{}' with score: {}".format(config.class_names[clss_idx], clss_score[a]))
             # print()
 
-    def _draw_annotations(self, draw_obj, annotations, clss_idxs):
+    def _draw_annotations(self, draw_obj, annotations):
 
         for i in range(annotations.shape[0]):
-            self._draw_bbox(draw_obj, annotations[i], config.GT_COLOR, 'gt {}'.format(config.class_names[clss_idxs[i]]))
+            self._draw_bbox(draw_obj, annotations[i], config.GT_COLOR, 'gt {}'.format(config.class_names[int(annotations[i, -1])]))
             # print('Annotation as bbox: ', annotations[i, 0], annotations[i, 1], annotations[i, 2], annotations[i, 3])
 
     def save_loss_file(self, filepath='output/loss.jpg', filepath_log='output/log_loss.jpg'):
@@ -178,8 +178,8 @@ class Viz:
 
         for ith, inference in enumerate(inferences):
 
-            epoch, img, annotation, clss_idxs = inference[:4]
-            table_gts_positive_anchors, proposals, all_probs_object, anchors = inference[4:8]
+            epoch, img, annotations = inference[:3]
+            expanded_annotations, table_annotations_dbg, proposals, all_probs_object, anchors = inference[3:8]
             show_all_results = inference[8]
             probs_object, filtered_proposals = inference[9:11]
             clss_score, pred_clss_idxs, bboxes = inference[11:14]
@@ -191,10 +191,10 @@ class Viz:
 
             # TODO Serio que tenho que fazer esse monte de coisa pra visualizar ?
             img = img.detach().cpu().numpy().copy().transpose(1, 2, 0) * 255
-            annotation = annotation.detach().cpu().numpy().copy()
-            clss_idxs = clss_idxs.detach().cpu().numpy().copy().astype(np.int)
+            annotations = annotations.detach().cpu().numpy().copy()
 
-            table_gts_positive_anchors = table_gts_positive_anchors.detach().cpu().numpy().copy()
+            expanded_annotations = expanded_annotations.detach().cpu().numpy().copy()
+            table_annotations_dbg = table_annotations_dbg.detach().cpu().numpy().copy()
             proposals = proposals.detach().cpu().numpy().copy()
             all_probs_object = all_probs_object.detach().cpu().numpy().copy()
             anchors = anchors.detach().cpu().numpy().copy()
@@ -217,17 +217,20 @@ class Viz:
             # ## INIT RPN ###
             draw = ImageDraw.Draw(init_rpn_img)
 
-            for b in range(annotation.shape[0]):  # ### esse trecho de codigo todo aqui dentro pode ser deixado bem mais simples e similar aos outros de modo a ter uma unoca funcao pra tudo
+            idxs = expanded_annotations[:, -1] > 0.0
+            anchors = anchors[idxs]
+            proposals = proposals[idxs]
+            all_probs_object = all_probs_object[idxs]
+
+            for b in range(annotations.shape[0]):  # ### esse trecho de codigo todo aqui dentro pode ser deixado bem mais simples e similar aos outros de modo a ter uma unoca funcao pra tudo
 
                 # self._draw_gt_bbox(draw, annotation[b])
                 # draw.rectangle([annotation[b, 0], annotation[b, 1], annotation[b, 2], annotation[b, 3]], outline='green')
                 # print('Annotation as bbox: ', annotation[b, 0], annotation[b, 1], annotation[b, 2], annotation[b, 3])
 
-                selected_table_gts_positive_anchors = table_gts_positive_anchors[table_gts_positive_anchors[:, 0] == b, :]
+                for a in np.argwhere(table_annotations_dbg == b):
 
-                for a in range(selected_table_gts_positive_anchors.shape[0]):
-
-                    anchor_idx = selected_table_gts_positive_anchors[a, 1]
+                    anchor_idx = a[0]
                     self._draw_anchor_bbox(draw, anchors[anchor_idx])
                     self._draw_obj_bbox(draw, proposals[anchor_idx], all_probs_object[anchor_idx, 1])
                     # print('Anchors as bbox: ', anchors[anchor_idx, 0], anchors[anchor_idx, 1], anchors[anchor_idx, 2], anchors[anchor_idx, 3])
@@ -244,7 +247,7 @@ class Viz:
                 # ## FINAL RPN ###
                 draw = ImageDraw.Draw(final_rpn_img)
 
-                self._draw_annotations(draw, annotation, clss_idxs)
+                self._draw_annotations(draw, annotations)
 
                 # Since it is sorted by probs, the highest ones are drawn last to a better visualization.
                 for a in reversed(range(probs_object.shape[0])):
@@ -260,7 +263,7 @@ class Viz:
                 # ## FINAL ###
                 draw = ImageDraw.Draw(final_img)
 
-                self._draw_annotations(draw, annotation, clss_idxs)
+                self._draw_annotations(draw, annotations)
 
                 assert pred_clss_idxs.shape == clss_score.shape
 
@@ -283,35 +286,38 @@ class Viz:
 
             for i in range(anchors_np.shape[0]):
 
-                acw = anchors_np[i, 0]
-                ach = anchors_np[i, 1]
-                aw = anchors_np[i, 2]
-                ah = anchors_np[i, 3]
-
                 if just_center:
+                    aw = anchors_np[i, 2] - anchors_np[i, 0] + 1.0
+                    ah = anchors_np[i, 3] - anchors_np[i, 1] + 1.0
+                    acw = anchors_np[i, 0] + 0.5 * (aw - 1.0)
+                    ach = anchors_np[i, 1] + 0.5 * (ah - 1.0)
+
                     a0 = acw - 1.0
                     a1 = ach - 1.0
                     a2 = acw + 1.0
                     a3 = ach + 1.0
                 else:
-                    a0 = acw - 0.5 * (aw - 1)
-                    a1 = ach - 0.5 * (ah - 1)
-                    a2 = aw + a0 - 1
-                    a3 = ah + a1 - 1
+                    a0 = anchors_np[i, 0]
+                    a1 = anchors_np[i, 1]
+                    a2 = anchors_np[i, 2]
+                    a3 = anchors_np[i, 3]
 
                 real_draw.rectangle([offset + a0, offset + a1, offset + a2, offset + a3], outline='magenta')
 
             # real.show()
             real.save('output/anchors/{}.jpg'.format(filename))
 
-        anchors_np = rpn_anchors.detach().numpy().copy()
+        anchors_np = rpn_anchors.detach().cpu().numpy().copy()
 
         _show_anchors(anchors_np, image_size, 'valid_anchors')
         _show_anchors(anchors_np, image_size, 'valid_centers', just_center=True)
 
-    def show_associated_positive_anchors(self, img_number, anchors_np, table_gts_positive_anchors_np, annotation_np, image_size):
+    def show_associated_positive_anchors(self, img_number, anchors_np, expanded_annotations_np, annotations_np, image_size, table_annotations_dbg_np):
 
-        for gti in range(annotation_np.shape[0]):
+        # Filter out the background paddings (due to background anchors)
+        anchors_np = anchors_np[expanded_annotations_np[:, -1] > 0.0]
+
+        for gti in range(annotations_np.shape[0]):
 
             offset = 128
             img_np = np.zeros((image_size[1] + 2 * offset, image_size[0] + 2 * offset, 3))
@@ -319,39 +325,34 @@ class Viz:
             real_draw = ImageDraw.Draw(real)
             real_draw.rectangle([offset - 1, offset - 1, offset + image_size[0] - 1 + 1, offset + image_size[1] - 1 + 1], outline='yellow')  # atencao para o -1 e +1 e seu significado !
 
-            x0 = annotation_np[gti, 0]
-            y0 = annotation_np[gti, 1]
-            x1 = annotation_np[gti, 0] + annotation_np[gti, 2] - 1
-            y1 = annotation_np[gti, 1] + annotation_np[gti, 3] - 1
+            x0 = annotations_np[gti, 0]
+            y0 = annotations_np[gti, 1]
+            x1 = annotations_np[gti, 2]
+            y1 = annotations_np[gti, 3]
 
             real_draw.rectangle([offset + x0, offset + y0, offset + x1, offset + y1], outline='green')
 
-            for pai in np.argwhere(table_gts_positive_anchors_np[:, 0] == gti):
+            for pai in np.argwhere(table_annotations_dbg_np == gti):
 
-                positive_anchor_idx = table_gts_positive_anchors_np[pai[0], 1]
-
-                acw = anchors_np[positive_anchor_idx, 0]
-                ach = anchors_np[positive_anchor_idx, 1]
-                aw = anchors_np[positive_anchor_idx, 2]
-                ah = anchors_np[positive_anchor_idx, 3]
-
-                a0 = acw - 0.5 * (aw - 1)
-                a1 = ach - 0.5 * (ah - 1)
-                a2 = aw + a0 - 1
-                a3 = ah + a1 - 1
+                positive_anchor_idx = pai[0]
+                a0 = anchors_np[positive_anchor_idx, 0]
+                a1 = anchors_np[positive_anchor_idx, 1]
+                a2 = anchors_np[positive_anchor_idx, 2]
+                a3 = anchors_np[positive_anchor_idx, 3]
 
                 real_draw.rectangle([offset + a0, offset + a1, offset + a2, offset + a3], outline='magenta')
 
             real.save('output/anchors/associated_positive_anchors/{}_{}.jpg'.format(img_number, gti))
 
-    def show_masked_anchors(self, e, anchors, mask, table_gts_positive_anchors, annotation, image_size):
+    def show_masked_anchors(self, e, anchors, rpn_labels, expanded_annotations, annotations, image_size, table_annotations_dbg):
 
-        anchors_np = anchors.detach().numpy().copy()
-        mask_np = mask.detach().numpy().copy()
-        table_gts_positive_anchors_np = table_gts_positive_anchors.detach().numpy().copy()
-        annotation_np = annotation.detach().numpy().copy()
+        anchors_np = anchors.detach().cpu().numpy().copy()
+        mask_np = rpn_labels.detach().cpu().numpy().copy()
+        expanded_annotations_np = expanded_annotations.detach().cpu().numpy().copy()
+        annotations_np = annotations.detach().cpu().numpy().copy()
+        table_annotations_dbg_np = table_annotations_dbg.detach().cpu().numpy().copy()
 
-        self.show_associated_positive_anchors(e, anchors_np, table_gts_positive_anchors_np, annotation_np, image_size)
+        self.show_associated_positive_anchors(e, anchors_np, expanded_annotations_np, annotations_np, image_size, table_annotations_dbg_np)
 
         for mask, mask_name in zip([-1.0, 0.0, 1.0], ['middle', 'negative', 'positive']):
 
@@ -365,26 +366,26 @@ class Viz:
                 real_draw = ImageDraw.Draw(real)
                 real_draw.rectangle([offset - 1, offset - 1, offset + image_size[0] - 1 + 1, offset + image_size[1] - 1 + 1], outline='yellow')  # atencao para o -1 e +1 e seu significado !
 
-                for bi in range(annotation_np.shape[0]):
+                for bi in range(annotations_np.shape[0]):
 
-                    x0 = annotation_np[bi, 0]
-                    y0 = annotation_np[bi, 1]
-                    x1 = annotation_np[bi, 0] + annotation_np[bi, 2] - 1
-                    y1 = annotation_np[bi, 1] + annotation_np[bi, 3] - 1
+                    x0 = annotations_np[bi, 0]
+                    y0 = annotations_np[bi, 1]
+                    x1 = annotations_np[bi, 2]
+                    y1 = annotations_np[bi, 3]
 
                     real_draw.rectangle([offset + x0, offset + y0, offset + x1, offset + y1], outline='green')
 
-                acw = masked_anchors_np[i, 0]
-                ach = masked_anchors_np[i, 1]
-                aw = masked_anchors_np[i, 2]
-                ah = masked_anchors_np[i, 3]
-
-                a0 = acw - 0.5 * (aw - 1)
-                a1 = ach - 0.5 * (ah - 1)
-                a2 = aw + a0 - 1
-                a3 = ah + a1 - 1
+                a0 = masked_anchors_np[i, 0]
+                a1 = masked_anchors_np[i, 1]
+                a2 = masked_anchors_np[i, 2]
+                a3 = masked_anchors_np[i, 3]
 
                 real_draw.rectangle([offset + a0, offset + a1, offset + a2, offset + a3], outline='magenta')
+
+                aw = masked_anchors_np[i, 2] - masked_anchors_np[i, 0] + 1.0
+                ah = masked_anchors_np[i, 3] - masked_anchors_np[i, 1] + 1.0
+                acw = masked_anchors_np[i, 0] + 0.5 * (aw - 1.0)
+                ach = masked_anchors_np[i, 1] + 0.5 * (ah - 1.0)
 
                 a0 = acw - 1.0
                 a1 = ach - 1.0

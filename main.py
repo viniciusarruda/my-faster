@@ -55,8 +55,10 @@ def main():
 
     params = [p for p in model.parameters() if p.requires_grad is True]
 
-    optimizer = torch.optim.Adam(params, lr=0.0001, weight_decay=0.0001)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
+    # optimizer = torch.optim.Adam(params, lr=0.0001, weight_decay=0.0001)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
+    optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.0005)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
 
     output = model.infer(0, test_dataset, device)
     viz.record_inference(output)
@@ -83,13 +85,12 @@ def main():
 
     model.train()
 
-    data_size = len(train_dataloader)
+    display_times = 500
+    losses_str = ['rpn_prob', 'rpn_bbox', 'rpn', 'clss_reg_prob', 'clss_reg_bbox', 'clss_reg', 'total']
+    recorded_losses = {key: 0 for key in losses_str}
+    iteration = 0
 
     for e in trange(1, config.epochs + 1):
-
-        rpn_prob_loss_epoch, rpn_bbox_loss_epoch, rpn_loss_epoch = 0, 0, 0
-        clss_reg_prob_loss_epoch, clss_reg_bbox_loss_epoch, clss_reg_loss_epoch = 0, 0, 0
-        total_loss_epoch = 0
 
         # end_data_time = time.time()
         for img, annotation, rpn_labels, expanded_annotations in train_dataloader:
@@ -108,27 +109,26 @@ def main():
             # print(labels_class)      -> not balanced yet
             # exit()
 
+            iteration += 1
+
             optimizer.zero_grad()
 
-            rpn_prob_loss_item, rpn_bbox_loss_item, rpn_loss_item, clss_reg_prob_loss_item, clss_reg_bbox_loss_item, clss_reg_loss_item, total_loss = model.forward(img, annotation, rpn_labels, expanded_annotations)
+            # rpn_prob_loss_item, rpn_bbox_loss_item, rpn_loss_item, clss_reg_prob_loss_item, clss_reg_bbox_loss_item, clss_reg_loss_item, total_loss = model.forward(img, annotation, rpn_labels, expanded_annotations)
+            losses_item, total_loss = model.forward(img, annotation, rpn_labels, expanded_annotations)
 
-            rpn_prob_loss_epoch += rpn_prob_loss_item
-            rpn_bbox_loss_epoch += rpn_bbox_loss_item
-            rpn_loss_epoch += rpn_loss_item
-            clss_reg_prob_loss_epoch += clss_reg_prob_loss_item
-            clss_reg_bbox_loss_epoch += clss_reg_bbox_loss_item
-            clss_reg_loss_epoch += clss_reg_loss_item
-            total_loss_epoch += total_loss.item()
+            for e, key in enumerate(losses_str[:-1]):
+                recorded_losses[key] = losses_item[e]
+            recorded_losses[losses_str[-1]] = total_loss.item()
 
             total_loss.backward()
 
             optimizer.step()
 
-        # the lr plotted is based in one parameter
-        # if there is different lr for different parameters, it will not show them, just one: param_groups[0]
-        viz.record(e, rpn_prob_loss_epoch / data_size, rpn_bbox_loss_epoch / data_size, rpn_loss_epoch / data_size, clss_reg_prob_loss_epoch / data_size, clss_reg_bbox_loss_epoch / data_size, clss_reg_loss_epoch / data_size, total_loss_epoch / data_size, optimizer.param_groups[0]['lr'])
+            # the lr plotted is based in one parameter
+            # if there is different lr for different parameters, it will not show them, just one: param_groups[0]
+            display_on = iteration - 1 % display_times == 0
+            viz.record_losses(e, iteration, display_on, recorded_losses, optimizer.param_groups[0]['lr'])
 
-        # if e % 10 == 0:
         output = model.infer(e, test_dataset, device)
         viz.record_inference(output)
         model.train()

@@ -137,26 +137,28 @@ class Viz:
         fig.tight_layout()
         plt.savefig(filepath)
 
-    def record(self, epoch, rpn_prob_loss, rpn_bbox_loss, rpn_loss, clss_reg_prob_loss, clss_reg_bbox_loss, clss_reg_loss, total_loss, learning_rate):
+    def record_losses(self, epoch, iteration, display_on, recorded_losses, learning_rate):
 
         if self.tensorboard:
-            self.writer.add_scalar('Loss-RPN/class', rpn_prob_loss, epoch)
-            self.writer.add_scalar('Loss-RPN/bbox', rpn_bbox_loss, epoch)
+            self.writer.add_scalar('Loss-RPN/class', recorded_losses['rpn_prob'], epoch)
+            self.writer.add_scalar('Loss-RPN/bbox', recorded_losses['rpn_bbox'], epoch)
 
-            self.writer.add_scalar('Loss-Regressor/class', clss_reg_prob_loss, epoch)
-            self.writer.add_scalar('Loss-Regressor/bbox', clss_reg_bbox_loss, epoch)
+            self.writer.add_scalar('Loss-Regressor/class', recorded_losses['clss_reg_prob'], epoch)
+            self.writer.add_scalar('Loss-Regressor/bbox', recorded_losses['clss_reg_bbox'], epoch)
 
-            self.writer.add_scalar('Loss/rpn', rpn_loss, epoch)
-            self.writer.add_scalar('Loss/regressor', clss_reg_loss, epoch)
-            self.writer.add_scalar('Loss/total', total_loss, epoch)
+            self.writer.add_scalar('Loss/rpn', recorded_losses['rpn'], epoch)
+            self.writer.add_scalar('Loss/regressor', recorded_losses['clss_reg'], epoch)
+            self.writer.add_scalar('Loss/total', recorded_losses['total'], epoch)
 
             self.writer.add_scalar('Learning-rate', learning_rate, epoch)
 
-            self.writer.flush()
+            # self.writer.flush()
 
-        if self.screen:
-            s = '\nEpoch {}: rpn_prob_loss: {} + rpn_bbox_loss: {} = {}'.format(epoch, rpn_prob_loss, rpn_bbox_loss, rpn_loss)
-            s += '\n       : clss_reg_prob_loss: {} + clss_reg_bbox_loss: {} = {}'.format(clss_reg_prob_loss, clss_reg_bbox_loss, clss_reg_loss)
+        if self.screen and display_on:
+            s = '\nEpoch {} | Iteration {}'.format(epoch, iteration)
+            s += '\n       : total_loss: {:.3f}'.format(recorded_losses['total'])
+            s += '\n       : rpn_prob_loss: {:.3f} + rpn_bbox_loss: {:.3f} = {:.3f}'.format(epoch, recorded_losses['rpn_prob'], recorded_losses['rpn_bbox'], recorded_losses['rpn'])
+            s += '\n       : clss_reg_prob_loss: {:.3f} + clss_reg_bbox_loss: {:.3f} = {:.3f}'.format(recorded_losses['clss_reg_prob'], recorded_losses['clss_reg_bbox'], recorded_losses['clss_reg'])
             s += '\n       : learning rate: {}'.format(learning_rate)
             tqdm.write(s)
 
@@ -164,13 +166,13 @@ class Viz:
 
             self.epochs.append(epoch)
 
-            self.rpn_prob_loss.append(rpn_prob_loss)
-            self.rpn_bbox_loss.append(rpn_bbox_loss)
-            self.rpn_loss.append(rpn_loss)
+            self.rpn_prob_loss.append(recorded_losses['rpn_prob'])
+            self.rpn_bbox_loss.append(recorded_losses['rpn_bbox'])
+            self.rpn_loss.append(recorded_losses['rpn'])
 
-            self.clss_reg_prob_loss.append(clss_reg_prob_loss)
-            self.clss_reg_bbox_loss.append(clss_reg_bbox_loss)
-            self.clss_reg_loss.append(clss_reg_loss)
+            self.clss_reg_prob_loss.append(recorded_losses['clss_reg_prob'])
+            self.clss_reg_bbox_loss.append(recorded_losses['clss_reg_bbox'])
+            self.clss_reg_loss.append(recorded_losses['clss_reg'])
 
             self.learning_rate.append(learning_rate)
 

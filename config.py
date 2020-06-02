@@ -2,16 +2,16 @@
 # TODO: standardize to more intuitive names and capslock?
 
 # Dataset used to train
-img_folder = 'dataset/Cityscapes/all_val/'
-annotations_file = 'dataset/Cityscapes/1_val_car.csv'
+img_folder = 'dataset/Cityscapes/all_train/'
+annotations_file = 'dataset/Cityscapes/cityscapes_train.csv'
 
 # Dataset used to validate
 val_img_folder = 'dataset/Cityscapes/all_val/'
 val_annotations_file = 'dataset/Cityscapes/1_val_car.csv'
 
 # The class '__background__' must always be at zero index and the user should not use it to label your data, unless you know what you are doing.
-# class_names = ['__background__', 'car', 'rider', 'person', 'motorcycle', 'bicycle', 'train', 'bus', 'truck']
-class_names = ['__background__', 'car']
+class_names = ['__background__', 'car', 'rider', 'person', 'motorcycle', 'bicycle', 'train', 'bus', 'truck']
+# class_names = ['__background__', 'car']
 n_classes = len(class_names)
 
 original_img_size = (2048, 1024)  # should get from data, maybe in the __getitem__ function
@@ -28,7 +28,7 @@ min_size = 8.0  # training only
 # min_size = 16.0  # inference only
 
 # Available backbones: Toy, ResNet
-backbone = 'Toy'
+backbone = 'ResNet101'
 
 # RPN batch size
 rpn_batch_size = 256
@@ -39,7 +39,7 @@ batch_size = 128
 fg_fraction = 0.25
 
 # Number of epochs to run
-epochs = 100  # 25  # 1000
+epochs = 25  # 1000
 
 # RPN anchor ratios and scales
 rpn_anchor_ratios = [0.5, 1, 2]

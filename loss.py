@@ -110,6 +110,7 @@ def get_target_mask(rpn_filtered_proposals, annotations, low_threshold=0.1, high
 
     # In contrast to RPN, here we also sample the target_bboxes
     # Remember: annotations have the classes attached in last dim
+    #E se eu nao balancear as bbox tbm? treinar uma versao assim tbm para ver no que da
     expanded_annotations = annotations[argmax_iou_gt[keep_idxs], :]
 
     # Set the bg_idxs annotation labels to background class

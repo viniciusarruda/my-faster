@@ -1,13 +1,20 @@
-
 # TODO: standardize to more intuitive names and capslock?
 
+verbose = True
+
 # Dataset used to train
-img_folder = 'dataset/Cityscapes/all_train/'
-annotations_file = 'dataset/Cityscapes/cityscapes_train.csv'
+img_folder = 'dataset/Cityscapes/all_val/'
+annotations_file = 'dataset/Cityscapes/one_val.csv'
+
+voc_folder = 'dataset/CityscapesVOC/VOC/'
+set_type = 'one_val'
 
 # Dataset used to validate
 val_img_folder = 'dataset/Cityscapes/all_val/'
-val_annotations_file = 'dataset/Cityscapes/1_val_car.csv'
+val_annotations_file = 'dataset/Cityscapes/one_val.csv'
+
+val_voc_folder = 'dataset/CityscapesVOC/VOC/'
+val_set_type = 'val'
 
 # The class '__background__' must always be at zero index and the user should not use it to label your data, unless you know what you are doing.
 class_names = ['__background__', 'car', 'rider', 'person', 'motorcycle', 'bicycle', 'train', 'bus', 'truck']
@@ -19,6 +26,7 @@ original_img_size = (2048, 1024)  # should get from data, maybe in the __getitem
 # Size that all images will be resized to
 # The annotations will be adjusted accordinly
 # (width, height) format
+# input_img_size = (1200, 600)
 # input_img_size = (1024, 512)
 input_img_size = (512, 256)
 # input_img_size = (224, 224)
@@ -28,7 +36,7 @@ min_size = 8.0  # training only
 # min_size = 16.0  # inference only
 
 # Available backbones: Toy, ResNet
-backbone = 'ResNet101'
+backbone = 'ResNet18'
 
 # RPN batch size
 rpn_batch_size = 256
@@ -42,8 +50,8 @@ fg_fraction = 0.25
 epochs = 25  # 1000
 
 # RPN anchor ratios and scales
-rpn_anchor_ratios = [0.5, 1, 2]
-rpn_anchor_scales = [4, 8, 16]
+rpn_anchor_ratios = [1] #[0.5, 1, 2]
+rpn_anchor_scales = [4]  #[4, 8, 16]
 # rpn_anchor_ratios = [0.8, 1, 1.2]
 # rpn_anchor_scales = [3.5, 4, 4.5]
 

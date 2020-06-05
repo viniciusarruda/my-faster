@@ -1,0 +1,36 @@
+<annotation>
+	<folder>Unspecified</folder>
+	<filename>lindau_000008_000019_leftImg8bit.jpg</filename>
+	<segmented>0</segmented>
+	<size>
+		<width>2048</width>
+		<height>1024</height>
+		<depth>3</depth>
+	</size>
+	<object>
+		<bndbox>
+			<xmin>1722</xmin>
+			<ymin>402</ymin>
+			<xmax>1833</xmax>
+			<ymax>529</ymax>
+		</bndbox>
+		<name>car</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+	<object>
+		<bndbox>
+			<xmin>1415</xmin>
+			<ymin>293</ymin>
+			<xmax>1779</xmax>
+			<ymax>639</ymax>
+		</bndbox>
+		<name>car</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+</annotation>

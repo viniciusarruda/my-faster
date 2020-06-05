@@ -8,19 +8,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-# def show_training_sample(img_np, annotation_np):
-
-#     img_np *= 255
-#     real = Image.fromarray(img_np.astype(np.uint8))
-#     annotation_np = _offset2bbox(annotation_np)
-
-#     print('Annotation np: ', annotation_np)
-
-#     real_draw = ImageDraw.Draw(real)
-#     for i in range(annotation_np.shape[0]):
-#         real_draw.rectangle([annotation_np[i, 0], annotation_np[i, 1], annotation_np[i, 2], annotation_np[i, 3]], outline='red')
-#     real.show()
-
 
 class Viz:
 
@@ -140,31 +127,31 @@ class Viz:
     def record_losses(self, epoch, iteration, display_on, recorded_losses, learning_rate):
 
         if self.tensorboard:
-            self.writer.add_scalar('Loss-RPN/class', recorded_losses['rpn_prob'], epoch)
-            self.writer.add_scalar('Loss-RPN/bbox', recorded_losses['rpn_bbox'], epoch)
+            self.writer.add_scalar('Loss-RPN/class', recorded_losses['rpn_prob'], iteration)
+            self.writer.add_scalar('Loss-RPN/bbox', recorded_losses['rpn_bbox'], iteration)
 
-            self.writer.add_scalar('Loss-Regressor/class', recorded_losses['clss_reg_prob'], epoch)
-            self.writer.add_scalar('Loss-Regressor/bbox', recorded_losses['clss_reg_bbox'], epoch)
+            self.writer.add_scalar('Loss-Regressor/class', recorded_losses['clss_reg_prob'], iteration)
+            self.writer.add_scalar('Loss-Regressor/bbox', recorded_losses['clss_reg_bbox'], iteration)
 
-            self.writer.add_scalar('Loss/rpn', recorded_losses['rpn'], epoch)
-            self.writer.add_scalar('Loss/regressor', recorded_losses['clss_reg'], epoch)
-            self.writer.add_scalar('Loss/total', recorded_losses['total'], epoch)
+            self.writer.add_scalar('Loss/rpn', recorded_losses['rpn'], iteration)
+            self.writer.add_scalar('Loss/regressor', recorded_losses['clss_reg'], iteration)
+            self.writer.add_scalar('Loss/total', recorded_losses['total'], iteration)
 
-            self.writer.add_scalar('Learning-rate', learning_rate, epoch)
+            self.writer.add_scalar('Learning-rate', learning_rate, iteration)
 
             # self.writer.flush()
 
         if self.screen and display_on:
             s = '\nEpoch {} | Iteration {}'.format(epoch, iteration)
             s += '\n       : total_loss: {:.3f}'.format(recorded_losses['total'])
-            s += '\n       : rpn_prob_loss: {:.3f} + rpn_bbox_loss: {:.3f} = {:.3f}'.format(epoch, recorded_losses['rpn_prob'], recorded_losses['rpn_bbox'], recorded_losses['rpn'])
+            s += '\n       : rpn_prob_loss: {:.3f} + rpn_bbox_loss: {:.3f} = {:.3f}'.format(recorded_losses['rpn_prob'], recorded_losses['rpn_bbox'], recorded_losses['rpn'])
             s += '\n       : clss_reg_prob_loss: {:.3f} + clss_reg_bbox_loss: {:.3f} = {:.3f}'.format(recorded_losses['clss_reg_prob'], recorded_losses['clss_reg_bbox'], recorded_losses['clss_reg'])
             s += '\n       : learning rate: {}'.format(learning_rate)
             tqdm.write(s)
 
         if self.files:
 
-            self.epochs.append(epoch)
+            self.epochs.append(iteration)
 
             self.rpn_prob_loss.append(recorded_losses['rpn_prob'])
             self.rpn_bbox_loss.append(recorded_losses['rpn_bbox'])
@@ -182,32 +169,13 @@ class Viz:
 
             epoch, img, annotations = inference[:3]
             expanded_annotations, table_annotations_dbg, proposals, all_probs_object, anchors = inference[3:8]
-            show_all_results = inference[8]
-            probs_object, filtered_proposals = inference[9:11]
-            clss_score, pred_clss_idxs, bboxes = inference[11:14]
+            probs_object, filtered_proposals = inference[8:10]
+            clss_score, pred_clss_idxs, bboxes = inference[10:13]
 
-            if epoch == 0:
+            if epoch == 1:
                 os.mkdir('output/rpn/img_{}/'.format(ith))
                 os.mkdir('output/final_rpn/img_{}/'.format(ith))
                 os.mkdir('output/final/img_{}/'.format(ith))
-
-            # TODO Serio que tenho que fazer esse monte de coisa pra visualizar ?
-            img = img.detach().cpu().numpy().copy().transpose(1, 2, 0) * 255
-            annotations = annotations.detach().cpu().numpy().copy()
-
-            expanded_annotations = expanded_annotations.detach().cpu().numpy().copy()
-            table_annotations_dbg = table_annotations_dbg.detach().cpu().numpy().copy()
-            proposals = proposals.detach().cpu().numpy().copy()
-            all_probs_object = all_probs_object.detach().cpu().numpy().copy()
-            anchors = anchors.detach().cpu().numpy().copy()
-
-            probs_object = probs_object.detach().cpu().numpy().copy()
-            filtered_proposals = filtered_proposals.detach().cpu().numpy().copy()
-
-            if show_all_results:
-                clss_score = clss_score.detach().cpu().numpy().copy()
-                pred_clss_idxs = pred_clss_idxs.detach().cpu().numpy().copy()  # ja esta como np.int..
-                bboxes = bboxes.detach().cpu().numpy().copy()
 
             img = Image.fromarray(img.astype(np.uint8))
             init_rpn_img = img.copy()
@@ -244,35 +212,33 @@ class Viz:
             init_rpn_img.save('output/rpn/img_{}/epoch_{}.jpg'.format(ith, epoch))
             self.writer.add_image('img_{}/begin-RPN'.format(ith), np.array(init_rpn_img), epoch, dataformats='HWC')
 
-            if show_all_results:  # if there is an inferred bbox
+            # ## FINAL RPN ###
+            draw = ImageDraw.Draw(final_rpn_img)
 
-                # ## FINAL RPN ###
-                draw = ImageDraw.Draw(final_rpn_img)
+            self._draw_annotations(draw, annotations)
 
-                self._draw_annotations(draw, annotations)
+            # Since it is sorted by probs, the highest ones are drawn last to a better visualization.
+            for a in reversed(range(probs_object.shape[0])):
+                self._draw_obj_bbox(draw, filtered_proposals[a], probs_object[a])
 
-                # Since it is sorted by probs, the highest ones are drawn last to a better visualization.
-                for a in reversed(range(probs_object.shape[0])):
-                    self._draw_obj_bbox(draw, filtered_proposals[a], probs_object[a])
+                # print('Proposals as bbox: ', filtered_proposals[a, 0], filtered_proposals[a, 1], filtered_proposals[a, 2], filtered_proposals[a, 3])
+                # print('Prob: ', probs_object[a])
+                # print()
 
-                    # print('Proposals as bbox: ', filtered_proposals[a, 0], filtered_proposals[a, 1], filtered_proposals[a, 2], filtered_proposals[a, 3])
-                    # print('Prob: ', probs_object[a])
-                    # print()
+            final_rpn_img.save('output/final_rpn/img_{}/epoch_{}.jpg'.format(ith, epoch))
+            self.writer.add_image('img_{}/end-RPN'.format(ith), np.array(final_rpn_img), epoch, dataformats='HWC')
 
-                final_rpn_img.save('output/final_rpn/img_{}/epoch_{}.jpg'.format(ith, epoch))
-                self.writer.add_image('img_{}/end-RPN'.format(ith), np.array(final_rpn_img), epoch, dataformats='HWC')
+            # ## FINAL ###
+            draw = ImageDraw.Draw(final_img)
 
-                # ## FINAL ###
-                draw = ImageDraw.Draw(final_img)
+            self._draw_annotations(draw, annotations)
 
-                self._draw_annotations(draw, annotations)
+            assert pred_clss_idxs.shape == clss_score.shape
 
-                assert pred_clss_idxs.shape == clss_score.shape
+            self._draw_predictions(draw, bboxes, pred_clss_idxs, clss_score)
 
-                self._draw_predictions(draw, bboxes, pred_clss_idxs, clss_score)
-
-                final_img.save('output/final/img_{}/epoch_{}.jpg'.format(ith, epoch))
-                self.writer.add_image('img_{}/final-output'.format(ith), np.array(final_img), epoch, dataformats='HWC')
+            final_img.save('output/final/img_{}/epoch_{}.jpg'.format(ith, epoch))
+            self.writer.add_image('img_{}/final-output'.format(ith), np.array(final_img), epoch, dataformats='HWC')
 
         self.writer.flush()
 
@@ -309,7 +275,7 @@ class Viz:
             # real.show()
             real.save('output/anchors/{}.jpg'.format(filename))
 
-        anchors_np = rpn_anchors.detach().cpu().numpy().copy()
+        anchors_np = rpn_anchors.detach().cpu().numpy()
 
         _show_anchors(anchors_np, image_size, 'valid_anchors')
         _show_anchors(anchors_np, image_size, 'valid_centers', just_center=True)
@@ -348,11 +314,12 @@ class Viz:
 
     def show_masked_anchors(self, e, anchors, rpn_labels, expanded_annotations, annotations, image_size, table_annotations_dbg):
 
-        anchors_np = anchors.detach().cpu().numpy().copy()
-        mask_np = rpn_labels.detach().cpu().numpy().copy()
-        expanded_annotations_np = expanded_annotations.detach().cpu().numpy().copy()
-        annotations_np = annotations.detach().cpu().numpy().copy()
-        table_annotations_dbg_np = table_annotations_dbg.detach().cpu().numpy().copy()
+        e = e.detach().cpu().numpy()[0]
+        anchors_np = anchors.detach().cpu().numpy()
+        mask_np = rpn_labels.detach().cpu().numpy()
+        expanded_annotations_np = expanded_annotations.detach().cpu().numpy()
+        annotations_np = annotations.detach().cpu().numpy()
+        table_annotations_dbg_np = table_annotations_dbg.detach().cpu().numpy()
 
         self.show_associated_positive_anchors(e, anchors_np, expanded_annotations_np, annotations_np, image_size, table_annotations_dbg_np)
 

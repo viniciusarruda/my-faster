@@ -4,7 +4,6 @@ import torch.nn as nn
 from rpn import RPN
 from roi import ROI
 from loss import get_target_distance, get_target_distance2, get_target_mask, compute_prob_loss
-from dataset_loader import inv_normalize
 import torch.nn.functional as F
 from backbone import ToyBackbone, ResNetBackbone
 from bbox_utils import clip_boxes, anchors_offset2bbox, anchors_bbox2offset
@@ -30,17 +29,17 @@ class FasterRCNN(nn.Module):
 
     def forward(self, img, annotations, rpn_labels, expanded_annotations):
 
-        features = self.fe_net.base(img)
-        # features.size() -> torch.Size([1, fe.out_dim, fe.feature_extractor_size, fe.feature_extractor_size])
+        if self.training:
+            pre_nms_top_n = config.train_pre_nms_top_n
+            pos_nms_top_n = config.train_pos_nms_top_n
+        else:
+            pre_nms_top_n = config.test_pre_nms_top_n
+            pos_nms_top_n = config.test_pos_nms_top_n
 
-        # The RPN handles the batch channel. The input (features) has the batch channel (asserted to be 1)
-        # and outputs all the objects already handled
-        proposals, cls_out, filtered_proposals, probs_object = self.rpn_net.forward(features, config.train_pre_nms_top_n, config.train_pos_nms_top_n)
-        # proposals.size()          -> torch.Size([#valid_anchors, 4])
-        # cls_out.size()            -> torch.Size([#valid_anchors, 2])
-        # filtered_proposals.size() -> torch.Size([#filtered_proposals, 4])
+        features = self.fe_net.base(img)
+
+        proposals, cls_out, filtered_proposals, probs_object = self.rpn_net.forward(features, pre_nms_top_n, pos_nms_top_n)
         # probs_object.size()       -> torch.Size([#filtered_proposals]) #NOTE just for visualization.. temporary
-        # The features object has its batch channel kept due to later use
 
         #####
         # essa linha de baixo tinha quee star logo abaixo da liha do rpn forward apos a filtragem
@@ -50,134 +49,41 @@ class FasterRCNN(nn.Module):
         # na filtragem, vai filtrar tbm com a COND (uma matriz de filtragem) para filtrar usando os proprios indices da table_gts_positive_anchors
         # para saber se vai pra frente ou n, ou seja, gerando uma nova table_gts_positive_anchors para o regressor. com isso, a primeira coluna consegue indexas as classes.
 
-        # inspect here !
-        # sera que to fazendo errado que nem no rpn ou agora aqui esta certo?
-        # acho que vou ter que comparar com o codigo original.. bosta ein
-        proposal_annotations, filtered_proposals = get_target_mask(filtered_proposals, annotations)
-        # Now, the bug has been fixed.
-        # The solution was to also use the gtboxes in the filtered_proposals set as seen in the original implementation (not mentioned in the paper and any other material)
-        # This will add the gt as "proposals" with cls_mask == 1 to them.
-        # Thus, this assertion must never fail
+        if self.training:
+            proposal_annotations, filtered_proposals = get_target_mask(filtered_proposals, annotations)
 
-        # The filtered_proposals will act as the anchors in the RPN
-        # and the table_gts_positive_proposals will act as the table_gts_positive_anchors in the RPN
-
-        # Compute RPN loss #
-        rpn_bbox_loss = get_target_distance(proposals, self.rpn_net.valid_anchors, expanded_annotations)
-        rpn_prob_loss = compute_prob_loss(cls_out, rpn_labels)
-        #####
-
-        # rpn_loss = 10 * rpn_prob_loss + rpn_bbox_loss
-        rpn_loss = rpn_prob_loss + rpn_bbox_loss
-
-        # rpn_prob_loss_epoch += rpn_prob_loss.item()
-        # rpn_bbox_loss_epoch += rpn_bbox_loss.item()
-        # rpn_loss_epoch += rpn_loss.item()
-
-        # check how many times enters here to try to remove this if
         rois = self.roi_net.forward(filtered_proposals, features)
-        # rois.size()      -> torch.Size([#filtered_proposals, fe.out_dim, roi_net.out_dim, roi_net.out_dim])
 
         raw_reg, raw_cls = self.fe_net.top_cls_reg(rois)
-        # raw_reg, raw_cls = self.clss_reg.forward(tmp)
-        # raw_reg.size()   -> torch.Size([#filtered_proposals, 4])
-        # raw_cls.size()   -> torch.Size([#filtered_proposals, 2])
 
-        # Compute class_reg loss ##
+        if not self.training:
+
+            refined_bboxes, clss_score, pred_clss_idxs = self.infer_bboxes(filtered_proposals, raw_reg, raw_cls)
+            ret = [refined_bboxes, clss_score, pred_clss_idxs]
+
+            if config.verbose:
+
+                ret += [proposals,
+                        F.softmax(cls_out, dim=1),
+                        self.rpn_net.valid_anchors,
+                        probs_object,
+                        filtered_proposals]
+
+            return tuple(map(lambda x: x.detach().cpu().numpy(), ret))
+
+        # Compute RPN loss
+        rpn_bbox_loss = get_target_distance(proposals, self.rpn_net.valid_anchors, expanded_annotations)
+        rpn_prob_loss = compute_prob_loss(cls_out, rpn_labels)
+        rpn_loss = rpn_prob_loss + rpn_bbox_loss
+
+        # Compute class_reg loss
         clss_reg_bbox_loss = get_target_distance2(raw_reg, filtered_proposals, proposal_annotations)
-
         clss_reg_prob_loss = compute_prob_loss(raw_cls, proposal_annotations[:, -1].long())
         clss_reg_loss = clss_reg_prob_loss + clss_reg_bbox_loss
 
-        # clss_reg_bbox_loss_epoch += clss_reg_bbox_loss.item()
-        # clss_reg_loss_epoch += clss_reg_loss.item()
-
         total_loss = rpn_loss + clss_reg_loss
-        # total_loss_epoch += total_loss.item() # note this shoulb below the else!
 
         return rpn_prob_loss.item(), rpn_bbox_loss.item(), rpn_loss.item(), clss_reg_prob_loss.item(), clss_reg_bbox_loss.item(), clss_reg_loss.item(), total_loss
-
-    # NOTE note que este codigo eh identico ao do treino porem sem a loss e backward.. teria como fazer essa funcao funcionar para ambos treino e inferencia?
-    # quero mostrar tbm na iter zero, antes de iniciar o treino
-    def infer(self, epoch, dataset, device):
-
-        output = []
-
-        # for net in [self.fe_net, self.rpn_net, self.roi_net, self.clss_reg]: net.eval()
-        # for net in [self.fe_net, self.rpn_net, self.roi_net]: net.eval()
-        self.eval()
-
-        with torch.no_grad():
-
-            # for ith, (img, annotation, labels, table_gts_positive_anchors) in enumerate(dataloader):
-            # there is a random number being generated inside the Dataloader: https://pytorch.org/docs/stable/_modules/torch/utils/data/dataloader.html#DataLoader
-            # in the final version, use the dataloader if is more fancy
-            for ith in range(len(dataset)):
-
-                img, annotations, rpn_labels, expanded_annotations, table_annotations_dbg = dataset[ith]
-                img = img.unsqueeze(0)
-                annotations = annotations.unsqueeze(0)
-                rpn_labels = rpn_labels.unsqueeze(0)
-                expanded_annotations = expanded_annotations.unsqueeze(0)
-                table_annotations_dbg = table_annotations_dbg.unsqueeze(0)
-
-                assert img.size(0) == annotations.size(0) == rpn_labels.size(0) == expanded_annotations.size(0) == table_annotations_dbg.size(0) == 1
-                img, annotations = img.to(device), annotations[0, :, :].to(device)
-                rpn_labels, expanded_annotations = rpn_labels[0, :].to(device), expanded_annotations[0, :, :].to(device)
-                table_annotations_dbg = table_annotations_dbg[0, :].to(device)
-
-                features = self.fe_net.base(img)
-                # proposals, cls_out, filtered_proposals, probs_object = self.rpn_net.forward(features)
-                proposals, cls_out, filtered_proposals, probs_object = self.rpn_net.forward(features, config.test_pre_nms_top_n, config.test_pos_nms_top_n)
-
-                # if there is any proposal which is classified as an object
-                if filtered_proposals.size(0) > 0:  # this if has to be implemented inside the visualization?
-
-                    rois = self.roi_net(filtered_proposals, features)
-                    raw_reg, raw_cls = self.fe_net.top_cls_reg(rois)
-
-                    show_all_results = True
-
-                    refined_bboxes, clss_score, pred_clss_idxs = self.infer_bboxes(filtered_proposals, raw_reg, raw_cls)
-
-                else:
-                    print('Reproduce this.. got no filtered proposals when testing...')
-                    print('no bbox proposals by RPN while inferring')
-                    exit()
-                    clss_score = None
-                    pred_clss_idxs = None
-                    show_all_results = False
-
-                ith_output = [epoch]
-
-                ith_output += [inv_normalize(img[0, :, :, :].clone().detach())]
-                ith_output += [annotations]
-
-                ith_output += [expanded_annotations, table_annotations_dbg]
-                ith_output += [proposals]
-                ith_output += [F.softmax(cls_out, dim=1)]
-                ith_output += [self.rpn_net.valid_anchors]
-
-                ith_output += [show_all_results]
-
-                ith_output += [probs_object]
-                ith_output += [filtered_proposals]
-
-                if show_all_results:
-
-                    ith_output += [clss_score]
-                    ith_output += [pred_clss_idxs]
-                    ith_output += [refined_bboxes]
-
-                else:
-
-                    ith_output += [None]
-                    ith_output += [None]
-                    ith_output += [None]
-
-                output.append(ith_output)
-
-        return output
 
     def infer_bboxes(self, rpn_proposals, reg, clss):
 

@@ -1,4 +1,5 @@
 rm output/*.jpg
+rm output/predictions/* -r
 rm output/rpn/* -r
 rm output/final_rpn/* -r
 rm output/final/* -r

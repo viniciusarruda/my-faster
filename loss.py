@@ -48,6 +48,7 @@ def anchor_labels(anchors, annotations, negative_threshold=0.3, positive_thresho
     # e.g., bbox inside an anchor, the other ratios of this anchor (i.e., with same area) that also
     # wraps the bbox will result in a same iou;
     # Any: Reduce the big match table to values deciding which anchor is foreground
+    max_iou_gt[max_iou_gt == 0] = 1e-5  # To avoid non-overlaping bboxes to be selected (e.g. bbox near the image boarded where there is no valid anchors covering)
     match = torch.any(torch.eq(ious, max_iou_gt.view(-1, 1)), dim=0)
 
     # Set foreground anchors

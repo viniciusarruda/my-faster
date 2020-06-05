@@ -17,13 +17,14 @@ class ROI(nn.Module):
     def forward(self, proposals, features):
 
         # input_img_size -> (width, height)
-        fx = features.size(2) / self.input_img_size[1]  # ja sei a priori
-        fy = features.size(3) / self.input_img_size[0]  # ja sei a priori
+        # fx = features.size(2) / self.input_img_size[1]  # ja sei a priori
+        # fy = features.size(3) / self.input_img_size[0]  # ja sei a priori
+        fx = 1.0 / 16.0
 
         # print(features.size(2), self.input_img_size[1])
         # print(features.size(3), self.input_img_size[0])
         # print(fx, fy)
-        assert fx == fy  # 1.0/16.0
+        # assert fx == fy  # 1.0/16.0
         # LOOK example usage.. but it is really shallow: https://github.com/jwyang/faster-rcnn.pytorch/blob/31ae20687b1b3486155809a57eeb376259a5f5d4/lib/model/roi_align/modules/roi_align.py#L18
 
         # TODO commentint out the above and setting spatial_scale to 1 shoud be equal, according to test_nms.py file

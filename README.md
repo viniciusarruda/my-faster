@@ -110,13 +110,16 @@
     - [x] Check what is the behavior if is already on cpu()
     - [x] Check if there is an elegant alternative. (R: I didnt find)
 - [x] Compare with the any implementation if it has bboxes out of the image.
-- [ ] Imprimir total loss tbm
+- [x] Imprimir total loss tbm
 - [ ] Standardize variables:
     - bbox format:   always x0, y0, x1, y1   with name: var_name_bf
     - offset format: always cw, ch, w, h     with name: var_name_of
-- [ ] Check why am I loosing so much annotations due to lack of positive assigned anchors. Is it really right?
- - start from here !
-- [ ] Check the necessity to assign 0 score to bboxes removed after NMS. acho que eh so pra sair as inferencias com bbox prob 0.. nas hora de calcular o map e tal
+- [ ] Sera que se minimar a bbox background para tudo zero pode melhorar?
+      No momento estou apenas ignorando a existencia dela.. ela nem existe.. apenas o nao-objeto da RPN
+- [ ] Ainda tem como adicionar a contagem das bboxes que n foram associadas por ancoras.
+    Pois tem as diretamente e indiretamente e também as nao associadas.. entao mostrar tbm essas estatisticas.
+- [x] Check the necessity to assign 0 score to bboxes removed after NMS. acho que eh so pra sair as inferencias com bbox prob 0.. nas hora de calcular o map e tal
+    - I didnt really understand why.. it is a padding.. but why?
 - [x] Implement ResNet50
 - [x] Implement ResNet101
 - [ ] Overfit some data.. check instability.. if persist, compare the overfiting against another Faster R-CNN implementation

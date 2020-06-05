@@ -1,0 +1,23 @@
+<annotation>
+	<folder>Unspecified</folder>
+	<filename>lindau_000030_000019_leftImg8bit.jpg</filename>
+	<segmented>0</segmented>
+	<size>
+		<width>2048</width>
+		<height>1024</height>
+		<depth>3</depth>
+	</size>
+	<object>
+		<bndbox>
+			<xmin>463</xmin>
+			<ymin>405</ymin>
+			<xmax>612</xmax>
+			<ymax>548</ymax>
+		</bndbox>
+		<name>truck</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+</annotation>

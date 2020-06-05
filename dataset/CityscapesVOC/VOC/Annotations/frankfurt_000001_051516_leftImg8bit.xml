@@ -1,0 +1,36 @@
+<annotation>
+	<folder>Unspecified</folder>
+	<filename>frankfurt_000001_051516_leftImg8bit.jpg</filename>
+	<segmented>0</segmented>
+	<size>
+		<width>2048</width>
+		<height>1024</height>
+		<depth>3</depth>
+	</size>
+	<object>
+		<bndbox>
+			<xmin>1083</xmin>
+			<ymin>375</ymin>
+			<xmax>1135</xmax>
+			<ymax>490</ymax>
+		</bndbox>
+		<name>person</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+	<object>
+		<bndbox>
+			<xmin>1116</xmin>
+			<ymin>358</ymin>
+			<xmax>1161</xmax>
+			<ymax>478</ymax>
+		</bndbox>
+		<name>person</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+</annotation>

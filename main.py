@@ -67,28 +67,40 @@ def main():
 
     params = [p for p in model.parameters() if p.requires_grad is True]
 
-    optimizer = torch.optim.Adam(params, lr=0.0001, weight_decay=0.0001)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
-    # optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.0005)
-    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+    optimizer = torch.optim.Adam(params, lr=0.0001, weight_decay=0.0005)
 
-    if config.verbose:
-        # drawing the anchors
-        viz.show_anchors(model.rpn_net.valid_anchors, config.input_img_size)
-        for idx, (_, annotations, rpn_labels, expanded_annotations, table_annotations_dbg) in test_dataloader:
-            viz.show_masked_anchors(idx,
-                                    model.rpn_net.valid_anchors,
-                                    rpn_labels[0, :].to(device),
-                                    expanded_annotations[0, :, :].to(device),
-                                    annotations[0, :, :].to(device),
-                                    config.input_img_size,
-                                    table_annotations_dbg[0, :].to(device))
-        # end of drawing the anchors
+
+    # print('I THINK I HAVE TO REMOVE ALL .SIZE() STUFF TO SHOW THE GRAPH')
+    # train_iter = iter(train_dataloader)
+    # img, annotations, rpn_labels, expanded_annotations = train_iter.next()
+    # assert img.size(0) == annotations.size(0) == rpn_labels.size(0) == expanded_annotations.size(0) == 1
+    # img, annotations = img.to(device), annotations[0, :, :].to(device)
+    # rpn_labels, expanded_annotations = rpn_labels[0, :].to(device), expanded_annotations[0, :, :].to(device)
+    # viz.save_graph(model, [img, annotations, rpn_labels, expanded_annotations])
+    # exit()
+
+    # if config.verbose:
+    #     # drawing the anchors
+    #     viz.show_anchors(model.rpn_net.valid_anchors, config.input_img_size)
+    #     for idx, (_, annotations, rpn_labels, expanded_annotations, table_annotations_dbg) in test_dataloader:
+    #         viz.show_masked_anchors(idx,
+    #                                 model.rpn_net.valid_anchors,
+    #                                 rpn_labels[0, :].to(device),
+    #                                 expanded_annotations[0, :, :].to(device),
+    #                                 annotations[0, :, :].to(device),
+    #                                 config.input_img_size,
+    #                                 table_annotations_dbg[0, :].to(device))
+    #     # end of drawing the anchors
 
     display_times = 500
     losses_str = ['rpn_prob', 'rpn_bbox', 'rpn', 'clss_reg_prob', 'clss_reg_bbox', 'clss_reg', 'total']
     recorded_losses = {key: 0 for key in losses_str}
     iteration = 0
+
+    torch.autograd.set_detect_anomaly(True)
+
+    # infer(1, model, test_dataloader, test_dataset, device, viz, evaluate=True)
+    # exit()
 
     for e in trange(1, config.epochs + 1):
 
@@ -124,7 +136,7 @@ def main():
             viz.record_losses(e, iteration, display_on, recorded_losses, optimizer.param_groups[0]['lr'])
             iteration += 1
 
-        scheduler.step()
+        # scheduler.step()
 
     infer(e, model, test_dataloader, test_dataset, device, viz, evaluate=True)
 

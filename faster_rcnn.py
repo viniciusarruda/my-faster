@@ -73,6 +73,8 @@ class FasterRCNN(nn.Module):
 
         # Compute RPN loss
         rpn_bbox_loss = get_target_distance(proposals, self.rpn_net.valid_anchors, expanded_annotations)
+        assert (rpn_labels == 1).sum() > 0
+        assert (rpn_labels == 0).sum() > 0
         rpn_prob_loss = compute_prob_loss(cls_out, rpn_labels)
         rpn_loss = rpn_prob_loss + rpn_bbox_loss
 
@@ -96,24 +98,25 @@ class FasterRCNN(nn.Module):
         clss_score = clss_score[torch.arange(clss_score.size(0)), clss_idxs]
 
         # Filter out the proposals which the net classifies as background
-        idxs_non_background = clss_idxs != 0
-        clss_idxs = clss_idxs[idxs_non_background]
-        clss_score = clss_score[idxs_non_background]
-        reg = reg[idxs_non_background, :]
-        rpn_proposals = rpn_proposals[idxs_non_background, :]
+        # idxs_non_background = clss_idxs != 0
+        # clss_idxs = clss_idxs[idxs_non_background]
+        # clss_score = clss_score[idxs_non_background]
+        # reg = reg[idxs_non_background, :]
+        # rpn_proposals = rpn_proposals[idxs_non_background, :]
+        # enable this asserton here if uncomment this out
+        # assert (clss_idxs == 0).sum() == 0
 
-        assert (clss_idxs == 0).sum() == 0
-
-        reg = reg.view(reg.size(0), config.n_classes - 1, 4)
-        reg = reg[torch.arange(reg.size(0)), clss_idxs - 1, :]
+        reg = reg.view(reg.size(0), config.n_classes, 4)
+        reg = reg[torch.arange(reg.size(0)), clss_idxs, :]
 
         #need an if visualization here! (because to compute mAP is all (i..e, >= 0.0))
         # Filter out lower scores
-        idxs_non_lower = clss_score > 0.3
-        clss_idxs = clss_idxs[idxs_non_lower]
-        clss_score = clss_score[idxs_non_lower]
-        reg = reg[idxs_non_lower, :]
-        rpn_proposals = rpn_proposals[idxs_non_lower, :]
+        # if config.verbose:
+        #     idxs_non_lower = clss_score > 0.3
+        #     clss_idxs = clss_idxs[idxs_non_lower]
+        #     clss_score = clss_score[idxs_non_lower]
+        #     reg = reg[idxs_non_lower, :]
+        #     rpn_proposals = rpn_proposals[idxs_non_lower, :]
 
         #make a funcion with this.. avoid repeated code.. and cetralize to avoid bugs
         # refine the bbox appling the bbox to px, py, pw and ph

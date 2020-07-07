@@ -12,7 +12,6 @@ def smooth_l1(x, sigma=3.0):
     x_abs = torch.abs(x)
 
     cond = x_abs < (1.0 / sigma2)
-
     true_cond = sigma2 * x * x * 0.5
     false_cond = x_abs - (0.5 / sigma2)
 
@@ -62,8 +61,11 @@ def anchor_labels(anchors, annotations, negative_threshold=0.3, positive_thresho
     # Taking care of only considering as foreground anchors the ones with iou > 0
     # Again, the strategy here is different from when generating the rpn_labels
     idxs = max_iou_anchors > 0.0
-    assert idxs.sum() != 0  # so pq eu quero saber quando vai cair nesse caso para saber o comportamento .. acho praticamente impossivel
+    assert idxs.sum() > 0  # so pq eu quero saber quando vai cair nesse caso para saber o comportamento .. acho praticamente impossivel
     expanded_annotations[idxs, :] = annotations[argmax_iou_anchors[idxs], :]
+
+    assert (rpn_labels == 0).sum() > 0
+    assert (rpn_labels == 1).sum() > 0
 
     return rpn_labels, expanded_annotations, argmax_iou_anchors[idxs] # this last is just to show (debug)
 
@@ -86,7 +88,7 @@ def get_target_mask(rpn_filtered_proposals, annotations, low_threshold=0.1, high
 
     # Select up to max_fg_idxs foreground proposals
     if n_fg_idxs > max_fg_idxs:
-        keep_idxs = torch.randperm(n_fg_idxs, device=annotations.device)[:n_fg_idxs - max_fg_idxs]
+        keep_idxs = torch.randperm(n_fg_idxs, device=annotations.device)[:max_fg_idxs]
         fg_idxs = fg_idxs[keep_idxs]
         n_fg_idxs = max_fg_idxs
     # ---------------------------------------------- #
@@ -101,7 +103,7 @@ def get_target_mask(rpn_filtered_proposals, annotations, low_threshold=0.1, high
 
     if n_bg_idxs > max_bg_idxs:
         # Sample the bg_proposals to fill the remaining batch space
-        keep_idxs = torch.randperm(n_bg_idxs, device=annotations.device)[:n_bg_idxs - max_bg_idxs]
+        keep_idxs = torch.randperm(n_bg_idxs, device=annotations.device)[:max_bg_idxs]
         bg_idxs = bg_idxs[keep_idxs]
         n_bg_idxs = max_bg_idxs
     # ---------------------------------------------- #
@@ -120,7 +122,10 @@ def get_target_mask(rpn_filtered_proposals, annotations, low_threshold=0.1, high
     # Also filter the proposals, to lately match the target annotations in the loss
     proposals = all_proposals[keep_idxs, :]
 
-    return expanded_annotations, proposals
+    assert n_bg_idxs > 0
+    assert n_fg_idxs > 0 # impossible since I added the gt, unless there is no gt? but I think dataset.py is handling this
+
+    return expanded_annotations.detach(), proposals.detach()
 
 #da pra passar o idx acomo parametro e colocar no lugar do : ao ives de fazer a mascara no get_target_distance
 def _parametrize_bbox(bbox, a_bbox):
@@ -164,15 +169,25 @@ def get_target_distance2(raw_reg, rpn_filtered_proposals, proposal_annotations):
     # print(raw_reg.size())
     # print(rpn_filtered_proposals.size())
     # print(proposal_annotations.size())
-    # # inspect this. raw_reg will change with multiclass
     # print('111')
-    
+
+    # print((proposal_annotations[:, -1] == 0).sum(), (proposal_annotations[:, -1] == 1).sum(), (proposal_annotations[:, -1] == 2).sum())
+
     fg_idxs = proposal_annotations[:, -1] > 0
+
+    # print(fg_idxs.sum(), fg_idxs.size())
+
+    # print('*************')
+    # print(rpn_filtered_proposals[:15])
+    # print(proposal_annotations[:15])
+    # print('*************')
+    # exit()
 
     rpn_filtered_proposals = anchors_bbox2offset(rpn_filtered_proposals[fg_idxs, :])
     target_bboxes = anchors_bbox2offset(proposal_annotations[fg_idxs, :-1])
+
     # -1 Because I did not include the prediction of background bboxes:
-    target_classes = proposal_annotations[fg_idxs, -1].long() - 1
+    target_classes = proposal_annotations[fg_idxs, -1].long()# - 1
 
 
     # remove the zeros bboxes

@@ -1,1 +1,1 @@
-frankfurt_000000_003025_leftImg8bit
+frankfurt_000000_000294_leftImg8bit

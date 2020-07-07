@@ -22,14 +22,20 @@ def parse_rec(filename):
     for obj in tree.findall('object'):
         obj_struct = {}
         obj_struct['name'] = obj.find('name').text
-        obj_struct['pose'] = obj.find('pose').text
+        # obj_struct['pose'] = obj.find('pose').text
+        obj_struct['pose'] = 'Unspecified' if obj.find('pose') is None else obj.find('pose').text  # Added this if by me (Vinicius Arruda) - check your script to generate pascal voc format!
         obj_struct['truncated'] = int(obj.find('truncated').text)
         obj_struct['difficult'] = int(obj.find('difficult').text)
         bbox = obj.find('bndbox')
-        obj_struct['bbox'] = [int(bbox.find('xmin').text),
-                              int(bbox.find('ymin').text),
-                              int(bbox.find('xmax').text),
-                              int(bbox.find('ymax').text)]
+        # obj_struct['bbox'] = [int(bbox.find('xmin').text),
+        #                       int(bbox.find('ymin').text),
+        #                       int(bbox.find('xmax').text),
+        #                       int(bbox.find('ymax').text)]
+        obj_struct['bbox'] = [int(float(bbox.find('xmin').text)),  # Also, I added this float stuff.. again, need to check my script to generate the VOC format.
+                              int(float(bbox.find('ymin').text)),
+                              int(float(bbox.find('xmax').text)),
+                              int(float(bbox.find('ymax').text))]
+
         objects.append(obj_struct)
 
     ###################################

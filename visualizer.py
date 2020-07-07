@@ -31,9 +31,9 @@ class Viz:
 
         self.learning_rate = []
 
-        # self.font = ImageFont.truetype("UbuntuMono-R.ttf", size=10)
-        # self.font = ImageFont.truetype("Quicksand-Regular.ttf", size=10)
-        self.font = ImageFont.truetype("Quicksand-Medium.ttf", size=10)
+        self.font = ImageFont.truetype("arial.ttf", size=12)
+
+        self.create_folder = True
 
     def __del__(self):
 
@@ -124,6 +124,9 @@ class Viz:
         fig.tight_layout()
         plt.savefig(filepath)
 
+    def save_graph(self, model, input_to_model):
+        self.writer.add_graph(model, input_to_model=input_to_model)
+
     def record_losses(self, epoch, iteration, display_on, recorded_losses, learning_rate):
 
         if self.tensorboard:
@@ -172,7 +175,8 @@ class Viz:
             probs_object, filtered_proposals = inference[8:10]
             clss_score, pred_clss_idxs, bboxes = inference[10:13]
 
-            if epoch == 1:
+            if self.create_folder:
+                self.create_folder = False
                 os.mkdir('output/rpn/img_{}/'.format(ith))
                 os.mkdir('output/final_rpn/img_{}/'.format(ith))
                 os.mkdir('output/final/img_{}/'.format(ith))

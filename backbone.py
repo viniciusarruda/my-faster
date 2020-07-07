@@ -58,7 +58,7 @@ class ResNetBackbone(nn.Module):
         self.base = torch.nn.Sequential(*child_list[:7])  # equivalent to RCNN_base
         self.top = torch.nn.Sequential(child_list[7])     # equivalent to RCNN_top
         self.cls = nn.Linear(top_out_channels, config.n_classes)
-        self.reg = nn.Linear(top_out_channels, 4 * (config.n_classes - 1))
+        self.reg = nn.Linear(top_out_channels, 4 * config.n_classes)
 
         for l in [0, 1, 4]:
             for param in self.base[l].parameters():
@@ -148,7 +148,7 @@ class ToyBackbone(nn.Module):
 
         self.top = nn.Linear(7 * 7 * self.out_dim, 4096)
         self.cls = nn.Linear(4096, config.n_classes)  # background is already included in config.n_classes
-        self.reg = nn.Linear(4096, 4 * (config.n_classes - 1))
+        self.reg = nn.Linear(4096, 4 * config.n_classes)
 
     def top_cls_reg(self, rois):
 

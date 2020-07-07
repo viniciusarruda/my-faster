@@ -56,30 +56,31 @@ class DatasetWrapper(Dataset):
             data[i][1][:, 2] *= self.img_scales[0]
             data[i][1][:, 3] *= self.img_scales[1]
 
-        # # There is no filtering at all!!!!  # Filter small bboxes (not implemented in that famous pytorch version)
-        # # Filter by min_size
-        # new_data = []
-        # max_width, max_height = 0, 0
-        # min_width, min_height = config.input_img_size
-        # for i in range(len(data)):
-        #     w = data[i][1][2] - data[i][1][0] + 1.0
-        #     h = data[i][1][3] - data[i][1][1] + 1.0
+        # There is no filtering at all!!!!  # Filter small bboxes (not implemented in that famous pytorch version)
+        # Filter by min_size
+        new_data = []
+        n_removed_annotations = 0
+        n_annotations = 0
+        for i in range(len(data)):
+            w = data[i][1][:, 2] - data[i][1][:, 0] + 1.0
+            h = data[i][1][:, 3] - data[i][1][:, 1] + 1.0
 
-        #     if w >= config.min_size and h >= config.min_size:
-        #         new_data.append(data[i])
+            keep = (w >= config.min_size) & (h >= config.min_size)
+            n_annotations += keep.shape[0]
+            n_removed_annotations += (~keep).sum()
 
-        #         max_width, max_height = max(max_width, w), max(max_height, h)
-        #         min_width, min_height = min(min_width, w), min(min_height, h)
+            if keep.any():
+                new_data.append((data[i][0], data[i][1][keep, :]))
 
-        # if len(data) > len(new_data):
-        #     print('WARNING: {} annotations were smaller than the minimun width/height size, being removed ending with {} annotations.'.format(len(data) - len(new_data), len(new_data)))
+        if n_removed_annotations > 0:
+            print('WARNING: {} annotations were smaller than the minimun width/height size, being removed ending with {} annotations.'.format(n_removed_annotations, n_annotations - n_removed_annotations))
 
-        # assert len(new_data) > 0  # if there is no annotation in this image what should I do?
+        if len(data) > len(new_data):
+            print('WARNING: {} images with all annotations smaller than width/height size, being removed ending with {} images.'.format(len(data) - len(new_data), len(new_data)))
 
-        # print('INFO: max_width: {}, max_height: {}'.format(max_width, max_height))
-        # print('INFO: min_width: {}, min_height: {}'.format(min_width, min_height))
+        assert len(new_data) > 0  # if there is no annotation in this image what should I do?
 
-        # data = new_data
+        data = new_data
 
         max_width, max_height = 0, 0
         min_width, min_height = config.input_img_size
@@ -392,12 +393,16 @@ def VOC_format_loader(voc_base_path, set_type):
             xmin, ymin = np.float32(bbox.find('xmin').text), np.float32(bbox.find('ymin').text)
             xmax, ymax = np.float32(bbox.find('xmax').text), np.float32(bbox.find('ymax').text)
 
+            if xmin >= xmax or ymin >= ymax:
+                continue  # There is some wrong annotations in some datasets
+
             img_classes.append(class_name)
             annotation = np.array([xmin, ymin, xmax, ymax, np.float32(class_idx)])
             annotations.append(annotation)
 
-        annotations, idxs = np.unique(np.stack(annotations), axis=0, return_index=True)
-        img_classes = [img_classes[i] for i in idxs]
+        if len(annotations) > 0:
+            annotations, idxs = np.unique(np.stack(annotations), axis=0, return_index=True)
+            img_classes = [img_classes[i] for i in idxs]
 
         classes += img_classes
         data.append(('{}.jpg'.format(base_file_name), np.unique(np.stack(annotations), axis=0)))

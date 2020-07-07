@@ -79,7 +79,7 @@ class RPN(nn.Module):
         reg_out = reg_out.permute(1, 2, 0).contiguous().view(-1, 4)
         # reg_out -> (64 * 64 * k, 4)
 
-        proposals = self._anchors2proposals(reg_out)
+        proposals = self._anchors2proposals(reg_out)  # isso pode ser depois, pois na rpn_loss eu preciso do reg_out e n do proposals
         # proposals -> (#anchors, 4)
         # cls_out   -> (#anchors, 2)
         ####################################

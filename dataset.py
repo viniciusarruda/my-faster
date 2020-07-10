@@ -30,6 +30,9 @@ class DatasetWrapper(Dataset):
             voc_base_path, set_type = data_info
             img_dir = os.path.join(voc_base_path, 'JPEGImages')
             data, classes = VOC_format_loader(voc_base_path, set_type)
+            if train:
+                print('Including horizontally flipped data.')
+                data, classes = self.add_flipped_data(data, classes)
             #ao trocar para o abaixo deveria dar o mesmo resultado! (simple)
         else:
             print('Data format does not exist!')
@@ -70,7 +73,7 @@ class DatasetWrapper(Dataset):
             n_removed_annotations += (~keep).sum()
 
             if keep.any():
-                new_data.append((data[i][0], data[i][1][keep, :]))
+                new_data.append((data[i][0], data[i][1][keep, :], data[i][2]))
 
         if n_removed_annotations > 0:
             print('WARNING: {} annotations were smaller than the minimun width/height size, being removed ending with {} annotations.'.format(n_removed_annotations, n_annotations - n_removed_annotations))
@@ -127,12 +130,15 @@ class DatasetWrapper(Dataset):
 
     def _getitem_train(self, idx):
 
-        img_base_name, annotations, rpn_labels, expanded_annotations, _ = self.files_annot[idx]
+        img_base_name, annotations, rpn_labels, expanded_annotations, _, flipped = self.files_annot[idx]
         img_name = os.path.join(self.img_dir, img_base_name)
         image = Image.open(img_name)
         image = transforms.Resize((self.input_img_size[1], self.input_img_size[0]))(image)
         image = transforms.ToTensor()(image)
         image = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(image)
+
+        if flipped:
+            image = torch.flip(image, dims=(2,))
 
         # fazer o tracking de todo comentario.. tipo esse aqui, analisar se realmente preciso fazer o clone
         # e ir eliminando coisas desnecessarias e comentar o que eh necessario
@@ -176,16 +182,40 @@ class DatasetWrapper(Dataset):
 
     def _getitem_test(self, idx):
 
-        img_base_name, annotations, rpn_labels, expanded_annotations, table_annotations_dbg = self.files_annot[idx]
+        img_base_name, annotations, rpn_labels, expanded_annotations, table_annotations_dbg, flipped = self.files_annot[idx]
+        assert not flipped
         img_name = os.path.join(self.img_dir, img_base_name)
         image = Image.open(img_name)
         image = transforms.Resize((self.input_img_size[1], self.input_img_size[0]))(image)
         image = transforms.ToTensor()(image)
         image = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(image)
 
+        # if flipped:
+        # image = torch.flip(image, dims=(2,))
+
         rpn_labels = rpn_labels.clone()  # I think this is not needed
 
         return image, annotations, rpn_labels, expanded_annotations, table_annotations_dbg
+
+    def add_flipped_data(self, data, classes):
+
+        flipped_data = []
+
+        for d, c in zip(data, classes):
+
+            filename, annotations, flipped = d
+
+            flipped_annotations = annotations.copy()
+            width = config.original_img_size[0]
+            flipped_annotations[:, 0] = width - annotations[:, 2] - 1.0
+            flipped_annotations[:, 2] = width - annotations[:, 0] - 1.0
+
+            flipped_data.append((filename, flipped_annotations, True))
+
+        all_data = data + flipped_data
+        all_classes = classes + classes
+
+        return all_data, all_classes
 
     def store_prediction(self, img_idx, bboxes, scores, clss):
 
@@ -222,7 +252,7 @@ class DatasetWrapper(Dataset):
 
             for img_idx in range(len(self.files_annot)):
 
-                filename = self.files_annot[img_idx][0].replace('.jpg', '')
+                filename = self.files_annot[img_idx][0].replace('.{}'.format(config.img_extension), '')
 
                 preds = self.predictions[img_idx][cls_idx]
 
@@ -315,26 +345,29 @@ def _format_data(data, anchors):
     anchors = anchors.to('cpu')
 
     #acho que n precisa criar o tensor aqui.. deixa para criar na hora do getitem - memoria..
-    data = [(filename, torch.tensor(annotations)) for filename, annotations in data]
+    data = [(filename, torch.tensor(annotations), flipped) for filename, annotations, flipped in data]
     new_data = []
 
     n_annotations = 0
     n_imgs = 0
     n_annotations_directly_assigned = 0
+    n_flipped = 0
 
     print('Processing bounding boxes')
-    for filename, annotations in tqdm(data):
+    for filename, annotations, flipped in tqdm(data):
 
         n_imgs += 1
         n_annotations += annotations.size(0)
+        n_flipped += flipped
 
         rpn_labels, expanded_annotations, table_annotations_dbg = anchor_labels(anchors, annotations)
 
         n_annotations_directly_assigned += table_annotations_dbg.unique().size(0)
-        new_data.append((filename, annotations, rpn_labels, expanded_annotations, table_annotations_dbg))
+        new_data.append((filename, annotations, rpn_labels, expanded_annotations, table_annotations_dbg, flipped))
 
     print('{} bounding boxes in {} images in the dataset.'.format(n_annotations, n_imgs))
     print('{} bounding boxes was directly assigned with anchors.'.format(n_annotations_directly_assigned))
+    print('{} flipped data and {} not flipped data.'.format(n_flipped, len(data) - n_flipped))
     print('(The not directly assigned anchors may not covered by an anchor or have a higher IoU with another bbox, but will be trained and maybe get a proposal assigned to it - low-hanging fruit here?)')
 
     return new_data
@@ -404,7 +437,7 @@ def VOC_format_loader(voc_base_path, set_type):
             annotations, idxs = np.unique(np.stack(annotations), axis=0, return_index=True)
             img_classes = [img_classes[i] for i in idxs]
 
-        classes += img_classes
-        data.append(('{}.jpg'.format(base_file_name), np.unique(np.stack(annotations), axis=0)))
+            classes += img_classes
+            data.append(('{}.{}'.format(base_file_name, config.img_extension), np.unique(np.stack(annotations), axis=0), False))
 
     return data, classes

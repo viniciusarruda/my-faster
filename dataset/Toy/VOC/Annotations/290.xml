@@ -1,0 +1,23 @@
+<annotation>
+	<folder>Unspecified</folder>
+	<filename>290.png</filename>
+	<segmented>0</segmented>
+	<size>
+		<width>224</width>
+		<height>224</height>
+		<depth>3</depth>
+	</size>
+	<object>
+		<bndbox>
+			<xmin>185</xmin>
+			<ymin>108</ymin>
+			<xmax>216</xmax>
+			<ymax>134</ymax>
+		</bndbox>
+		<name>triangle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+</annotation>

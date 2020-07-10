@@ -116,6 +116,9 @@ PORQUE DEU O MESMO MIN E MAX WIDTH E HEIGHT COM TRAINVAL E TEST LA NA CAR206?
     - esta explodindo os valores tanto pra muito negativo quando para muito positivo na reg_bbox da rpn..
     - try the initilization and the learning parameters of the network.
     - assert fg/bg com fg >= 1!
+- [ ] Test with TOY:
+    - Test with large toy dataset
+    - Test with large toy dataset with ovelapping objects
 - [ ] Check the detach() issue
     - Maybe, I have to detach something to get a better result
 - [ ] Regress the background bbox class to zero to see if get a better result

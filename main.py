@@ -69,7 +69,10 @@ def main():
 
     optimizer = torch.optim.Adam(params, lr=0.0001, weight_decay=0.0005)
 
-
+    # GRAPHHH !!!!!!!!!
+    # GRAPHHH !!!!!!!!!
+    # GRAPHHH !!!!!!!!!
+    # GRAPHHH !!!!!!!!!
     # print('I THINK I HAVE TO REMOVE ALL .SIZE() STUFF TO SHOW THE GRAPH')
     # train_iter = iter(train_dataloader)
     # img, annotations, rpn_labels, expanded_annotations = train_iter.next()
@@ -79,18 +82,18 @@ def main():
     # viz.save_graph(model, [img, annotations, rpn_labels, expanded_annotations])
     # exit()
 
-    # if config.verbose:
-    #     # drawing the anchors
-    #     viz.show_anchors(model.rpn_net.valid_anchors, config.input_img_size)
-    #     for idx, (_, annotations, rpn_labels, expanded_annotations, table_annotations_dbg) in test_dataloader:
-    #         viz.show_masked_anchors(idx,
-    #                                 model.rpn_net.valid_anchors,
-    #                                 rpn_labels[0, :].to(device),
-    #                                 expanded_annotations[0, :, :].to(device),
-    #                                 annotations[0, :, :].to(device),
-    #                                 config.input_img_size,
-    #                                 table_annotations_dbg[0, :].to(device))
-    #     # end of drawing the anchors
+    if config.verbose:
+        # drawing the anchors
+        viz.show_anchors(model.rpn_net.valid_anchors, config.input_img_size)
+        for idx, (_, annotations, rpn_labels, expanded_annotations, table_annotations_dbg) in test_dataloader:
+            viz.show_masked_anchors(idx,
+                                    model.rpn_net.valid_anchors,
+                                    rpn_labels[0, :].to(device),
+                                    expanded_annotations[0, :, :].to(device),
+                                    annotations[0, :, :].to(device),
+                                    config.input_img_size,
+                                    table_annotations_dbg[0, :].to(device))
+        # end of drawing the anchors
 
     display_times = 500
     losses_str = ['rpn_prob', 'rpn_bbox', 'rpn', 'clss_reg_prob', 'clss_reg_bbox', 'clss_reg', 'total']

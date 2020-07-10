@@ -1,0 +1,36 @@
+<annotation>
+	<folder>Unspecified</folder>
+	<filename>116.png</filename>
+	<segmented>0</segmented>
+	<size>
+		<width>224</width>
+		<height>224</height>
+		<depth>3</depth>
+	</size>
+	<object>
+		<bndbox>
+			<xmin>136</xmin>
+			<ymin>45</ymin>
+			<xmax>206</xmax>
+			<ymax>105</ymax>
+		</bndbox>
+		<name>triangle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+	<object>
+		<bndbox>
+			<xmin>11</xmin>
+			<ymin>15</ymin>
+			<xmax>45</xmax>
+			<ymax>49</ymax>
+		</bndbox>
+		<name>circle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+</annotation>

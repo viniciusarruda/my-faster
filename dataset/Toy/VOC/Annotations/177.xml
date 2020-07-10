@@ -1,0 +1,36 @@
+<annotation>
+	<folder>Unspecified</folder>
+	<filename>177.png</filename>
+	<segmented>0</segmented>
+	<size>
+		<width>224</width>
+		<height>224</height>
+		<depth>3</depth>
+	</size>
+	<object>
+		<bndbox>
+			<xmin>50</xmin>
+			<ymin>60</ymin>
+			<xmax>188</xmax>
+			<ymax>113</ymax>
+		</bndbox>
+		<name>rectangle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+	<object>
+		<bndbox>
+			<xmin>50</xmin>
+			<ymin>163</ymin>
+			<xmax>92</xmax>
+			<ymax>187</ymax>
+		</bndbox>
+		<name>rectangle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+</annotation>

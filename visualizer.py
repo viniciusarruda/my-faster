@@ -176,7 +176,6 @@ class Viz:
             clss_score, pred_clss_idxs, bboxes = inference[10:13]
 
             if self.create_folder:
-                self.create_folder = False
                 os.mkdir('output/rpn/img_{}/'.format(ith))
                 os.mkdir('output/final_rpn/img_{}/'.format(ith))
                 os.mkdir('output/final/img_{}/'.format(ith))
@@ -243,6 +242,9 @@ class Viz:
 
             final_img.save('output/final/img_{}/epoch_{}.jpg'.format(ith, epoch))
             self.writer.add_image('img_{}/final-output'.format(ith), np.array(final_img), epoch, dataformats='HWC')
+
+        if self.create_folder:
+            self.create_folder = False
 
         self.writer.flush()
 

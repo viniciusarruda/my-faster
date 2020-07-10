@@ -1,0 +1,36 @@
+<annotation>
+	<folder>Unspecified</folder>
+	<filename>341.png</filename>
+	<segmented>0</segmented>
+	<size>
+		<width>224</width>
+		<height>224</height>
+		<depth>3</depth>
+	</size>
+	<object>
+		<bndbox>
+			<xmin>21</xmin>
+			<ymin>63</ymin>
+			<xmax>51</xmax>
+			<ymax>93</ymax>
+		</bndbox>
+		<name>circle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+	<object>
+		<bndbox>
+			<xmin>165</xmin>
+			<ymin>7</ymin>
+			<xmax>208</xmax>
+			<ymax>195</ymax>
+		</bndbox>
+		<name>rectangle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+</annotation>

@@ -1,0 +1,36 @@
+<annotation>
+	<folder>Unspecified</folder>
+	<filename>410.png</filename>
+	<segmented>0</segmented>
+	<size>
+		<width>224</width>
+		<height>224</height>
+		<depth>3</depth>
+	</size>
+	<object>
+		<bndbox>
+			<xmin>104</xmin>
+			<ymin>174</ymin>
+			<xmax>145</xmax>
+			<ymax>209</ymax>
+		</bndbox>
+		<name>triangle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+	<object>
+		<bndbox>
+			<xmin>33</xmin>
+			<ymin>109</ymin>
+			<xmax>103</xmax>
+			<ymax>179</ymax>
+		</bndbox>
+		<name>circle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+</annotation>

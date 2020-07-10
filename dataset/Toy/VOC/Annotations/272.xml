@@ -1,0 +1,36 @@
+<annotation>
+	<folder>Unspecified</folder>
+	<filename>272.png</filename>
+	<segmented>0</segmented>
+	<size>
+		<width>224</width>
+		<height>224</height>
+		<depth>3</depth>
+	</size>
+	<object>
+		<bndbox>
+			<xmin>21</xmin>
+			<ymin>150</ymin>
+			<xmax>199</xmax>
+			<ymax>204</ymax>
+		</bndbox>
+		<name>rectangle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+	<object>
+		<bndbox>
+			<xmin>19</xmin>
+			<ymin>28</ymin>
+			<xmax>77</xmax>
+			<ymax>78</ymax>
+		</bndbox>
+		<name>triangle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+</annotation>

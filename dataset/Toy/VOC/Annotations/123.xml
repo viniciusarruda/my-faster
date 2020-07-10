@@ -1,0 +1,36 @@
+<annotation>
+	<folder>Unspecified</folder>
+	<filename>123.png</filename>
+	<segmented>0</segmented>
+	<size>
+		<width>224</width>
+		<height>224</height>
+		<depth>3</depth>
+	</size>
+	<object>
+		<bndbox>
+			<xmin>67</xmin>
+			<ymin>77</ymin>
+			<xmax>139</xmax>
+			<ymax>149</ymax>
+		</bndbox>
+		<name>circle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+	<object>
+		<bndbox>
+			<xmin>8</xmin>
+			<ymin>184</ymin>
+			<xmax>48</xmax>
+			<ymax>208</ymax>
+		</bndbox>
+		<name>rectangle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+</annotation>

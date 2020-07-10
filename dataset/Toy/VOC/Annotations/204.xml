@@ -1,0 +1,23 @@
+<annotation>
+	<folder>Unspecified</folder>
+	<filename>204.png</filename>
+	<segmented>0</segmented>
+	<size>
+		<width>224</width>
+		<height>224</height>
+		<depth>3</depth>
+	</size>
+	<object>
+		<bndbox>
+			<xmin>118</xmin>
+			<ymin>139</ymin>
+			<xmax>192</xmax>
+			<ymax>213</ymax>
+		</bndbox>
+		<name>circle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+</annotation>

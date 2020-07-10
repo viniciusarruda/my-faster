@@ -1,0 +1,23 @@
+<annotation>
+	<folder>Unspecified</folder>
+	<filename>113.png</filename>
+	<segmented>0</segmented>
+	<size>
+		<width>224</width>
+		<height>224</height>
+		<depth>3</depth>
+	</size>
+	<object>
+		<bndbox>
+			<xmin>65</xmin>
+			<ymin>166</ymin>
+			<xmax>188</xmax>
+			<ymax>207</ymax>
+		</bndbox>
+		<name>rectangle</name>
+		<difficult>0</difficult>
+		<truncated>0</truncated>
+		<occluded>0</occluded>
+		<pose>Unspecified</pose>
+	</object>
+</annotation>

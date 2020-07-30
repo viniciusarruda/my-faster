@@ -1,0 +1,21 @@
+<annotation>
+	<object>
+		<bndbox>
+			<ymin>352.0</ymin>
+			<xmax>776.0</xmax>
+			<ymax>466.0</ymax>
+			<xmin>720.0</xmin>
+		</bndbox>
+		<name>person</name>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+	</object>
+	<filename>source_tubingen_000028_000019_leftImg8bit.jpg</filename>
+	<folder>VOC2007</folder>
+	<size>
+		<height>2048</height>
+		<width>1024</width>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+</annotation>

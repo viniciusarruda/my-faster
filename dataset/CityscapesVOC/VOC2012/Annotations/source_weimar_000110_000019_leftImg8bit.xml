@@ -1,0 +1,32 @@
+<annotation>
+	<object>
+		<bndbox>
+			<ymin>372.0</ymin>
+			<xmax>1880.0</xmax>
+			<ymax>449.0</ymax>
+			<xmin>1803.0</xmin>
+		</bndbox>
+		<name>car</name>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+	</object>
+	<object>
+		<bndbox>
+			<ymin>265.0</ymin>
+			<xmax>1805.0</xmax>
+			<ymax>500.0</ymax>
+			<xmin>1110.0</xmin>
+		</bndbox>
+		<name>bus</name>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+	</object>
+	<filename>source_weimar_000110_000019_leftImg8bit.jpg</filename>
+	<folder>VOC2007</folder>
+	<size>
+		<height>2048</height>
+		<width>1024</width>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+</annotation>

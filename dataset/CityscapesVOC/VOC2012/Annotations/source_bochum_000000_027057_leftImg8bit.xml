@@ -1,0 +1,32 @@
+<annotation>
+	<object>
+		<bndbox>
+			<ymin>386.0</ymin>
+			<xmax>928.0</xmax>
+			<ymax>508.0</ymax>
+			<xmin>752.0</xmin>
+		</bndbox>
+		<name>car</name>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+	</object>
+	<object>
+		<bndbox>
+			<ymin>316.0</ymin>
+			<xmax>1348.0</xmax>
+			<ymax>646.0</ymax>
+			<xmin>979.0</xmin>
+		</bndbox>
+		<name>car</name>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+	</object>
+	<filename>source_bochum_000000_027057_leftImg8bit.jpg</filename>
+	<folder>VOC2007</folder>
+	<size>
+		<height>2048</height>
+		<width>1024</width>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+</annotation>

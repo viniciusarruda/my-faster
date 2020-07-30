@@ -1,0 +1,32 @@
+<annotation>
+	<object>
+		<bndbox>
+			<ymin>190.0</ymin>
+			<xmax>1919.0</xmax>
+			<ymax>511.0</ymax>
+			<xmin>611.0</xmin>
+		</bndbox>
+		<name>bus</name>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+	</object>
+	<object>
+		<bndbox>
+			<ymin>147.0</ymin>
+			<xmax>616.0</xmax>
+			<ymax>473.0</ymax>
+			<xmin>6.0</xmin>
+		</bndbox>
+		<name>train</name>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+	</object>
+	<filename>source_krefeld_000000_013257_leftImg8bit.jpg</filename>
+	<folder>VOC2007</folder>
+	<size>
+		<height>2048</height>
+		<width>1024</width>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+</annotation>

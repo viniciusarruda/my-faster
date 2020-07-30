@@ -1,0 +1,32 @@
+<annotation>
+	<object>
+		<bndbox>
+			<ymin>434.0</ymin>
+			<xmax>993.0</xmax>
+			<ymax>489.0</ymax>
+			<xmin>958.0</xmin>
+		</bndbox>
+		<name>car</name>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+	</object>
+	<object>
+		<bndbox>
+			<ymin>429.0</ymin>
+			<xmax>972.0</xmax>
+			<ymax>491.0</ymax>
+			<xmin>890.0</xmin>
+		</bndbox>
+		<name>car</name>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+	</object>
+	<filename>source_tubingen_000101_000019_leftImg8bit.jpg</filename>
+	<folder>VOC2007</folder>
+	<size>
+		<height>2048</height>
+		<width>1024</width>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+</annotation>

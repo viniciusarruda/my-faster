@@ -1,0 +1,32 @@
+<annotation>
+	<object>
+		<bndbox>
+			<ymin>376.0</ymin>
+			<xmax>474.0</xmax>
+			<ymax>474.0</ymax>
+			<xmin>432.0</xmin>
+		</bndbox>
+		<name>person</name>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+	</object>
+	<object>
+		<bndbox>
+			<ymin>382.0</ymin>
+			<xmax>1145.0</xmax>
+			<ymax>475.0</ymax>
+			<xmin>1026.0</xmin>
+		</bndbox>
+		<name>car</name>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+	</object>
+	<filename>source_lindau_000054_000019_leftImg8bit.jpg</filename>
+	<folder>VOC2007</folder>
+	<size>
+		<height>2048</height>
+		<width>1024</width>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+</annotation>

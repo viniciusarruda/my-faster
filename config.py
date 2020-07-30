@@ -6,35 +6,35 @@ verbose = False
 # img_folder = 'dataset/Cityscapes/all_val/'
 # annotations_file = 'dataset/Cityscapes/one_val.csv'
 
-# voc_folder = 'dataset/CityscapesVOC/VOC/'
-voc_folder = 'dataset/Toy/VOC/'
-set_type = 'minimal'
+voc_folder = 'dataset/CityscapesVOC/VOC2012/'
+#voc_folder = 'dataset/Toy/VOC/'
+set_type = 'trainval'
 
-img_extension = 'png'
+img_extension = 'jpg'
 
 # Dataset used to validate
 # val_img_folder = 'dataset/Cityscapes/all_val/'
 # val_annotations_file = 'dataset/Cityscapes/one_val.csv'
 
-val_voc_folder = 'dataset/Toy/VOC/'
-val_set_type = 'minimal'
+val_voc_folder = 'dataset/CityscapesVOC/VOC2012/'
+val_set_type = 'test'
 
 # The class '__background__' must always be at zero index and the user should not use it to label your data, unless you know what you are doing.
-# class_names = ['__background__', 'car', 'rider', 'person', 'motorcycle', 'bicycle', 'train', 'bus', 'truck']
+class_names = ['__background__', 'car', 'rider', 'person', 'motorcycle', 'bicycle', 'train', 'bus', 'truck']
 # class_names = ['__background__', 'car', 'person']
-class_names = ['__background__', 'circle', 'triangle', 'rectangle']
+# class_names = ['__background__', 'circle', 'triangle', 'rectangle']
 n_classes = len(class_names)
 
-# original_img_size = (2048, 1024)  # should get from data, maybe in the __getitem__ function
+original_img_size = (2048, 1024)  # should get from data, maybe in the __getitem__ function
 # original_img_size = (256, 256)  # should get from data, maybe in the __getitem__ function
-original_img_size = (224, 224)
+#original_img_size = (224, 224)
 # Size that all images will be resized to
 # The annotations will be adjusted accordinly
 # (width, height) format
 # input_img_size = (1200, 600)
-# input_img_size = (1024, 512)
+input_img_size = (1024, 512)
 # input_img_size = (512, 256)
-input_img_size = (224, 224)
+# input_img_size = (224, 224)
 
 # minimun bbox width/height size
 min_size = 4.0  # training only
@@ -42,7 +42,7 @@ min_size = 4.0  # training only
 # min_size = 16.0  # inference only
 
 # Available backbones: Toy, ResNet
-backbone = 'ResNet18'
+backbone = 'ResNet101'
 
 # RPN batch size
 rpn_batch_size = 256
@@ -57,7 +57,7 @@ epochs = 25 # 1000
 
 # RPN anchor ratios and scales
 rpn_anchor_ratios = [0.5, 1, 2]
-rpn_anchor_scales = [4, 8] #[4, 8, 16, 32]
+rpn_anchor_scales = [4, 8, 16, 32]
 # rpn_anchor_ratios = [0.8, 1, 1.2]
 # rpn_anchor_scales = [3.5, 4, 4.5]
 

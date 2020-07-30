@@ -1,0 +1,32 @@
+<annotation>
+	<object>
+		<bndbox>
+			<ymin>374.0</ymin>
+			<xmax>2011.0</xmax>
+			<ymax>477.0</ymax>
+			<xmin>1960.0</xmin>
+		</bndbox>
+		<name>person</name>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+	</object>
+	<object>
+		<bndbox>
+			<ymin>402.0</ymin>
+			<xmax>1611.0</xmax>
+			<ymax>482.0</ymax>
+			<xmin>1453.0</xmin>
+		</bndbox>
+		<name>car</name>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+	</object>
+	<filename>source_strasbourg_000001_021951_leftImg8bit.jpg</filename>
+	<folder>VOC2007</folder>
+	<size>
+		<height>2048</height>
+		<width>1024</width>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+</annotation>

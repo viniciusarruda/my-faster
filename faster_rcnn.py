@@ -27,6 +27,23 @@ class FasterRCNN(nn.Module):
         self.rpn_net = RPN(input_img_size=config.input_img_size, feature_extractor_out_dim=self.fe_net.out_dim, feature_extractor_size=self.fe_net.feature_extractor_size, receptive_field_size=self.fe_net.receptive_field_size)
         self.roi_net = ROI(input_img_size=config.input_img_size)
 
+        self._init_weights()
+
+    def _init_weights(self):
+        def normal_init(m, mean, stddev):
+            """
+            weight initalizer: truncated normal and random normal.
+            """
+            m.weight.data.normal_(mean, stddev)
+            m.bias.data.zero_()
+
+        normal_init(self.rpn_net.conv_rpn, 0, 0.01)
+        normal_init(self.rpn_net.cls_layer, 0, 0.01)
+        normal_init(self.rpn_net.reg_layer, 0, 0.01)
+        normal_init(self.fe_net.cls, 0, 0.01)
+        normal_init(self.fe_net.reg, 0, 0.001)
+
+
     def forward(self, img, annotations, rpn_labels, expanded_annotations):
 
         if self.training:

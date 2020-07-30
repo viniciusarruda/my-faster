@@ -1,0 +1,21 @@
+<annotation>
+	<object>
+		<bndbox>
+			<ymin>357.0</ymin>
+			<xmax>597.0</xmax>
+			<ymax>632.0</ymax>
+			<xmin>173.0</xmin>
+		</bndbox>
+		<name>car</name>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+	</object>
+	<filename>source_monchengladbach_000001_001531_leftImg8bit.jpg</filename>
+	<folder>VOC2007</folder>
+	<size>
+		<height>2048</height>
+		<width>1024</width>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+</annotation>

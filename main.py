@@ -65,9 +65,21 @@ def main():
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=0)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=0)
 
-    params = [p for p in model.parameters() if p.requires_grad is True]
+    # params = [p for p in model.parameters() if p.requires_grad is True]
+    # optimizer = torch.optim.Adam(params, lr=0.0001, weight_decay=0.0005)
 
-    optimizer = torch.optim.Adam(params, lr=0.0001, weight_decay=0.0005)
+    params = []
+    for key, value in dict(model.named_parameters()).items():
+        if value.requires_grad:
+            if 'bias' in key:
+                params += [{'params':[value],'lr': 0.001, 'weight_decay': 0.0}]
+            else:
+                params += [{'params':[value],'lr': 0.001, 'weight_decay': 0.0001}]
+
+    optimizer = torch.optim.SGD(params, momentum=0.9)
+    #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+    #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[15, 20, 23], gamma=0.1)
 
     # GRAPHHH !!!!!!!!!
     # GRAPHHH !!!!!!!!!
@@ -139,7 +151,7 @@ def main():
             viz.record_losses(e, iteration, display_on, recorded_losses, optimizer.param_groups[0]['lr'])
             iteration += 1
 
-        # scheduler.step()
+        scheduler.step()
 
     infer(e, model, test_dataloader, test_dataset, device, viz, evaluate=True)
 

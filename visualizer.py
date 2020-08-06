@@ -270,13 +270,9 @@ class Viz:
                     a1 = ach - 1.0
                     a2 = acw + 1.0
                     a3 = ach + 1.0
+                    real_draw.rectangle([offset + a0, offset + a1, offset + a2, offset + a3], outline='magenta')
                 else:
-                    a0 = anchors_np[i, 0]
-                    a1 = anchors_np[i, 1]
-                    a2 = anchors_np[i, 2]
-                    a3 = anchors_np[i, 3]
-
-                real_draw.rectangle([offset + a0, offset + a1, offset + a2, offset + a3], outline='magenta')
+                    self._draw_anchor(real_draw, anchors_np, i, offset, 'magenta')
 
             # real.show()
             real.save('output/anchors/{}.jpg'.format(filename))
@@ -289,6 +285,7 @@ class Viz:
     def show_associated_positive_anchors(self, img_number, anchors_np, expanded_annotations_np, annotations_np, image_size, table_annotations_dbg_np):
 
         # Filter out the background paddings (due to background anchors)
+        # TODO now, expanded_annotations_np has no background, so just put an assertion here.
         anchors_np = anchors_np[expanded_annotations_np[:, -1] > 0.0]
 
         for gti in range(annotations_np.shape[0]):
@@ -299,22 +296,10 @@ class Viz:
             real_draw = ImageDraw.Draw(real)
             real_draw.rectangle([offset - 1, offset - 1, offset + image_size[0] - 1 + 1, offset + image_size[1] - 1 + 1], outline='yellow')  # atencao para o -1 e +1 e seu significado !
 
-            x0 = annotations_np[gti, 0]
-            y0 = annotations_np[gti, 1]
-            x1 = annotations_np[gti, 2]
-            y1 = annotations_np[gti, 3]
-
-            real_draw.rectangle([offset + x0, offset + y0, offset + x1, offset + y1], outline='green')
-
             for pai in np.argwhere(table_annotations_dbg_np == gti):
+                self._draw_anchor(real_draw, anchors_np, pai[0], offset, 'magenta')
 
-                positive_anchor_idx = pai[0]
-                a0 = anchors_np[positive_anchor_idx, 0]
-                a1 = anchors_np[positive_anchor_idx, 1]
-                a2 = anchors_np[positive_anchor_idx, 2]
-                a3 = anchors_np[positive_anchor_idx, 3]
-
-                real_draw.rectangle([offset + a0, offset + a1, offset + a2, offset + a3], outline='magenta')
+            self._draw_anchor(real_draw, annotations_np, gti, offset, 'green')
 
             real.save('output/anchors/associated_positive_anchors/{}_{}.jpg'.format(img_number, gti))
 
@@ -343,19 +328,9 @@ class Viz:
 
                 for bi in range(annotations_np.shape[0]):
 
-                    x0 = annotations_np[bi, 0]
-                    y0 = annotations_np[bi, 1]
-                    x1 = annotations_np[bi, 2]
-                    y1 = annotations_np[bi, 3]
+                    self._draw_anchor(real_draw, annotations_np, bi, offset, 'green')
 
-                    real_draw.rectangle([offset + x0, offset + y0, offset + x1, offset + y1], outline='green')
-
-                a0 = masked_anchors_np[i, 0]
-                a1 = masked_anchors_np[i, 1]
-                a2 = masked_anchors_np[i, 2]
-                a3 = masked_anchors_np[i, 3]
-
-                real_draw.rectangle([offset + a0, offset + a1, offset + a2, offset + a3], outline='magenta')
+                self._draw_anchor(real_draw, masked_anchors_np, i, offset, 'magenta')
 
                 aw = masked_anchors_np[i, 2] - masked_anchors_np[i, 0] + 1.0
                 ah = masked_anchors_np[i, 3] - masked_anchors_np[i, 1] + 1.0
@@ -369,3 +344,11 @@ class Viz:
                 real_draw.rectangle([offset + a0, offset + a1, offset + a2, offset + a3], outline='yellow')
 
                 real.save('output/anchors/{}/{}_{}.jpg'.format(mask_name, e, i))
+
+    def _draw_anchor(self, draw_obj, bboxes, idx, offset, color):
+
+        x0 = bboxes[idx, 0]
+        y0 = bboxes[idx, 1]
+        x1 = bboxes[idx, 2]
+        y1 = bboxes[idx, 3]
+        draw_obj.rectangle([offset + x0, offset + y0, offset + x1, offset + y1], outline=color)

@@ -41,10 +41,6 @@ def main():
 
     model = FasterRCNN().to(device)
 
-    # format_type = 'simple'
-    # train_data_info = (config.img_folder, config.annotations_file)
-    # test_data_info = (config.val_img_folder, config.val_annotations_file)
-
     format_type = 'VOC'
     train_data_info = (config.voc_folder, config.set_type)
     test_data_info = (config.val_voc_folder, config.val_set_type)
@@ -72,14 +68,15 @@ def main():
     for key, value in dict(model.named_parameters()).items():
         if value.requires_grad:
             if 'bias' in key:
-                params += [{'params':[value],'lr': 0.001, 'weight_decay': 0.0}]
+                params += [{'params': [value], 'lr': 0.001, 'weight_decay': 0.0}]
             else:
-                params += [{'params':[value],'lr': 0.001, 'weight_decay': 0.0001}]
+                params += [{'params': [value], 'lr': 0.001, 'weight_decay': 0.0001}]
 
     optimizer = torch.optim.SGD(params, momentum=0.9)
-    #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
-    #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[15, 20, 23], gamma=0.1)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+    # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[15, 20, 23], gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[500, 750, 900], gamma=0.1)
 
     # GRAPHHH !!!!!!!!!
     # GRAPHHH !!!!!!!!!
@@ -179,6 +176,8 @@ def infer(epoch, model, dataloader, dataset, device, viz, evaluate=False):
             table_annotations_dbg = table_annotations_dbg[0, :].to(device)
 
             refined_bboxes, clss_score, pred_clss_idxs, *ret = model.forward(img, annotations, rpn_labels, expanded_annotations)
+
+            ret = tuple(map(lambda x: x.detach().cpu().numpy(), ret))
 
             if evaluate:
                 dataset.store_prediction(ith.detach().cpu().numpy()[0], refined_bboxes, clss_score, pred_clss_idxs)

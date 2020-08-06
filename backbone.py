@@ -120,6 +120,15 @@ class View(nn.Module):
         return out
 
 
+class Inspect(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, input):
+        print(input.size())
+        return input
+
+
 class ToyBackbone(nn.Module):
     def __init__(self):
         super(ToyBackbone, self).__init__()
@@ -133,22 +142,19 @@ class ToyBackbone(nn.Module):
         self.receptive_field_size = 16  # 4 # 2 ^ number_of_maxpool_stride_2
         self.feature_extractor_size = (w // self.receptive_field_size, h // self.receptive_field_size)  # 14 #32
 
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=1, kernel_size=1, padding=0)
-        self.linear1 = nn.Linear(1 * self.max_h * self.max_w, 128)
-        self.linear2 = nn.Linear(128, self.out_dim * self.feature_extractor_size[0] * self.feature_extractor_size[1])
+        self.base = nn.Sequential(nn.Conv2d(in_channels=3, out_channels=32, kernel_size=7, stride=2, padding=3),
+                                  nn.ReLU(),
+                                  nn.MaxPool2d(kernel_size=2, stride=2),
+                                  nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=1),
+                                  nn.ReLU(),
+                                  nn.MaxPool2d(kernel_size=2, stride=2),
+                                  nn.Conv2d(in_channels=32, out_channels=self.out_dim, kernel_size=1, stride=1, padding=0),
+                                  nn.ReLU(),
+                                  nn.MaxPool2d(kernel_size=2, stride=2))
 
-        self.base = nn.Sequential(self.conv1,
-                                  nn.MaxPool2d(4),
-                                  View((1 * self.max_h * self.max_w,)),
-                                  self.linear1,
-                                  nn.Sigmoid(),
-                                  self.linear2,
-                                  nn.Sigmoid(),
-                                  View((self.out_dim, self.feature_extractor_size[1], self.feature_extractor_size[0])))
-
-        self.top = nn.Linear(7 * 7 * self.out_dim, 4096)
-        self.cls = nn.Linear(4096, config.n_classes)  # background is already included in config.n_classes
-        self.reg = nn.Linear(4096, 4 * config.n_classes)
+        self.top = nn.Linear(7 * 7 * self.out_dim, 1024)
+        self.cls = nn.Linear(1024, config.n_classes)  # background is already included in config.n_classes
+        self.reg = nn.Linear(1024, 4 * config.n_classes)
 
     def top_cls_reg(self, rois):
 
@@ -159,6 +165,32 @@ class ToyBackbone(nn.Module):
         return raw_reg, raw_cls
 
 
+class Test(nn.Module):
+    def __init__(self):
+        super(Test, self).__init__()
+        self.fe = ToyBackbone()
+
+    def forward(self, x):
+        print(x.size(), x.requires_grad)
+        x = self.fe.base(x)
+        print(x.size(), x.requires_grad)
+        return x
+
+
 if __name__ == "__main__":
-    fe = ResNetBackbone()
-    print(dir(fe))
+    te = Test()
+
+    for key, value in dict(te.named_parameters()).items():
+        if value.requires_grad:
+            print('YES', key)
+        else:
+            print('NOO', key)
+
+    te.eval()
+    with torch.no_grad():
+
+        x = torch.rand((1, 3, 224, 224))
+        print(x.size(), x.requires_grad)
+        x = te.forward(x)
+        print(x.size(), x.requires_grad)
+        # print(dir(fe))

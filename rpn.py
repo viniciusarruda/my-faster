@@ -28,6 +28,8 @@ class RPN(nn.Module):
         self.register_buffer('all_anchors', all_anchors)
         self.register_buffer('valid_anchors_mask', valid_anchors_mask)
         self.register_buffer('valid_anchors', all_anchors[valid_anchors_mask, :])
+        print('all_anchors: ', all_anchors.size())
+        print('anchors: ', all_anchors[valid_anchors_mask, :].size())
         # self.anchors, self.valid_anchors_mask = self.anchors.to(device), self.valid_anchors_mask.to(device)
         #################################
 
@@ -37,7 +39,7 @@ class RPN(nn.Module):
         self.reg_layer = nn.Conv2d(in_channels=512, out_channels=self.k * 4, kernel_size=1, stride=1, padding=0)
 
     def forward(self, x, pre_nms_top_n, pos_nms_top_n):
-        assert x.size(0) == 1  # remove this assertion later..
+        # assert x.size(0) == 1  # remove this assertion later..
         # x -> (batch_size, feature_extractor_out_dim, 64, 64)
 
         x = F.relu(self.conv_rpn(x))
@@ -131,7 +133,7 @@ class RPN(nn.Module):
         proposals = proposals[self.valid_anchors_mask, :]
         cls_out = cls_out[self.valid_anchors_mask, :]
 
-        return proposals, cls_out, filtered_proposals, probs_object
+        return proposals, cls_out, filtered_proposals.detach(), probs_object  # detach -> "approximate joint training" in the paper
 
     def _anchors2proposals(self, reg_out):
         """

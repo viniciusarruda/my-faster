@@ -30,7 +30,7 @@ class DatasetWrapper(Dataset):
             voc_base_path, set_type = data_info
             img_dir = os.path.join(voc_base_path, 'JPEGImages')
             data, classes = VOC_format_loader(voc_base_path, set_type)
-            if train:
+            if train and config.flip:
                 print('Including horizontally flipped data.')
                 data, classes = self.add_flipped_data(data, classes)
             #ao trocar para o abaixo deveria dar o mesmo resultado! (simple)
@@ -44,13 +44,17 @@ class DatasetWrapper(Dataset):
             assert (data[i][1][:, 2] <= config.original_img_size[0]).all() and (data[i][1][:, 3] <= config.original_img_size[1]).all()
             assert (data[i][1][:, 0] < data[i][1][:, 2]).all() and (data[i][1][:, 1] < data[i][1][:, 3]).all()
 
-            data[i][1][:, 2] -= 1.0  # np.finfo(np.float32).eps
-            data[i][1][:, 3] -= 1.0  # np.finfo(np.float32).eps
+            # dont do this..
+            # data[i][1][:, 2] -= 1.0  # np.finfo(np.float32).eps
+            # data[i][1][:, 3] -= 1.0  # np.finfo(np.float32).eps
 
         # Resize the annotations to the new image size
         # the -1 in input img_size is to ensure: [0, input_img_size-1]
-        self.img_scales = ((input_img_size[0] - 1.0) / float(config.original_img_size[0]),
-                           (input_img_size[1] - 1.0) / float(config.original_img_size[1]))
+        # self.img_scales = ((input_img_size[0] - 1.0) / float(config.original_img_size[0]),
+        #                    (input_img_size[1] - 1.0) / float(config.original_img_size[1]))
+        # without the -1.0
+        self.img_scales = ((input_img_size[0]) / float(config.original_img_size[0]),
+                           (input_img_size[1]) / float(config.original_img_size[1]))
 
         for i in range(len(data)):
             # the -1 in input img_size is to ensure: [0, input_img_size-1],
@@ -171,11 +175,18 @@ class DatasetWrapper(Dataset):
             idxs_to_suppress = negative_anchors_idxs[tmp_idxs]
             balanced_rpn_labels[idxs_to_suppress] = -1  # mark them as don't care
 
+
+        # unmap!?
+        # TODO
+        # dont needed for labels, since they are all dont cares..
+        #
+
         # You can see the difference before/after balancing the labels:
-        # print('---------')
+        # print('---------A')
+        # print(rpn_labels)
         # print((rpn_labels == -1).sum(), (rpn_labels == 0).sum(), (rpn_labels == 1).sum())
         # print((balanced_rpn_labels == -1).sum(), (balanced_rpn_labels == 0).sum(), (balanced_rpn_labels == 1).sum())
-        # print('---------')
+        # print('---------B')
         # exit()
 
         return image, annotations, balanced_rpn_labels, expanded_annotations
@@ -404,6 +415,7 @@ def VOC_format_loader(voc_base_path, set_type):
         image_set = f.readlines()
     image_set = [f.strip()for f in image_set]
 
+    n_imgs_without_annotations = 0
     data, classes = [], []
 
     for base_file_name in image_set:
@@ -439,5 +451,10 @@ def VOC_format_loader(voc_base_path, set_type):
 
             classes += img_classes
             data.append(('{}.{}'.format(base_file_name, config.img_extension), np.unique(np.stack(annotations), axis=0), False))
+        else:
+            n_imgs_without_annotations += 1
+
+    assert len(data) == len(image_set) - n_imgs_without_annotations
+    print('From {} images (in the image set), {} images have no annotations, ending with {} annotated images to train.'.format(len(image_set), n_imgs_without_annotations, len(data)))
 
     return data, classes

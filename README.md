@@ -111,17 +111,26 @@
     - [x] Check if there is an elegant alternative. (R: I didnt find)
 - [x] Compare with the any implementation if it has bboxes out of the image.
 - [x] Imprimir total loss tbm
-PORQUE DEU O MESMO MIN E MAX WIDTH E HEIGHT COM TRAINVAL E TEST LA NA CAR206?
 - [x] SOLVE THE NaN PROBLEM: 
     - esta explodindo os valores tanto pra muito negativo quando para muito positivo na reg_bbox da rpn..
     - try the initilization and the learning parameters of the network.
     - assert fg/bg com fg >= 1!
+- [ ] Visualize the graph -> there is a bug on PyTorch and it is not yet fixed
 - [ ] Test with TOY:
     - Test with large toy dataset
     - Test with large toy dataset with ovelapping objects
-- [ ] Check the detach() issue
+- [x] Check the detach() issue
     - Maybe, I have to detach something to get a better result
+    - Or no.. When the other implementation creates a new tensor by doing: 
+        B = A.new().zero_()    # A requires_grad == True, but B, created by new(), does not requires gradients
+      but, then some assignment are made
+        B[idxs_1, idxs_2] = T  # T is a tensor which requires gradient
+      then, B now requires gradients due to this assignment, so the other implementation has not this "detach()" effect which I was implementing in my get_target_mask() function in loss.py to the outputs.
 - [ ] Regress the background bbox class to zero to see if get a better result
+- [ ] MEAN and STD for the predictions in the second stage
+- [ ] CHECK WHERE TO PUT DETACH! LOOK ALL .DATA!
+    - CHECK THE BATCH SAMPLING STRATEGY FOR RPN
+    - CHECK ALL GRADIENTS! COMPARED EACH TENSOR OF THAT IMPLEMENTATION IF IS REQUIRING GRADS!
 - [ ] Check mAP on train and test set. Check for high bias and high variance as learned on deep learning specialization.
       The goal is to have highest mAP on both train/test set with the lower difference between them.
       If there is higher difference, then one decision should be made to better the result. (regularization, etc)

@@ -100,15 +100,18 @@ def anchors_bbox2offset(bboxes):
 
     """
 
-    assert bboxes.size(1) == 4
+    # assert bboxes.size(1) == 4
 
     # TODO: check if is better/faster to torch.zeros or stack as this function or as the above functions..
     anchors = torch.zeros(bboxes.size(), dtype=bboxes.dtype, device=bboxes.device)
 
     anchors[:, 2] = bboxes[:, 2] - bboxes[:, 0] + 1.0
     anchors[:, 3] = bboxes[:, 3] - bboxes[:, 1] + 1.0
-    anchors[:, 0] = bboxes[:, 0] + 0.5 * (anchors[:, 2] - 1.0)
-    anchors[:, 1] = bboxes[:, 1] + 0.5 * (anchors[:, 3] - 1.0)
+    # anchors[:, 0] = bboxes[:, 0] + 0.5 * (anchors[:, 2] - 1.0)
+    # anchors[:, 1] = bboxes[:, 1] + 0.5 * (anchors[:, 3] - 1.0)
+    # o de baixo esta compativel com a outra implementacao..
+    anchors[:, 0] = bboxes[:, 0] + 0.5 * anchors[:, 2]
+    anchors[:, 1] = bboxes[:, 1] + 0.5 * anchors[:, 3]
 
     return anchors
 
